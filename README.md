@@ -75,5 +75,8 @@ reproducible, and the tests assert against them.
 
 ## Status
 
-Scaffold complete: domain layer, both schemas, migrations, the import, and CI.
-Screens are being designed and are not built yet.
+Fully usable on a phone: onboarding, typed balances (negative for debts),
+three-tap capture, list with search/filters/swipe, edit-in-place, dashboard,
+people, net worth, category and account management — all persisted to SQLite
+on device. Supabase sync is the one piece not yet wired; the app says so
+honestly and works entirely offline.

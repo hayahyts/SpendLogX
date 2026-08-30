@@ -146,11 +146,25 @@ Quoted often, and each is checked by a test:
 | Conflated under the name "Beb" | ₵13,874 in the sheet — ₵2,275 of family spending plus an ₵11,599 loan repayment, now separated |
 | Rows carrying the old form's default date | 29 of 40 — one reason none of it is imported |
 
+## Persistence
+
+The store is in memory and every applied action is written through to SQLite
+(`src/db/local.ts`), behind a two-method interface that better-sqlite3 also
+satisfies — so the layer is tested in vitest against a real database, foreign
+keys included. `src/db/ddl.ts` is generated from the drizzle migration by
+`scripts/gen-ddl.ts`, and a test pins the copy byte-identical. Web builds swap
+in `persist.web.ts` and run in memory; the phone is where data lives. Deletes
+are soft, because the sync design needs tombstones.
+
+Demo mode (`EXPO_PUBLIC_DEMO` unset or `1`) never touches the database.
+`EXPO_PUBLIC_DEMO=0` is the shipping configuration: fresh installs are gated
+into onboarding until a household exists.
+
 ## Open
 
-**Nothing is persisted yet.** The store is in memory. `src/db/` has the schema
-and migrations for both dialects; wiring the store to expo-sqlite, and then the
-outbox to Supabase, is the next piece.
+**Supabase sync is not wired.** Sign-in is local identity, join-by-invite
+stores nothing remotely, and the sync line reports only what is true: saved on
+this phone. The outbox schema exists for when the backend arrives.
 
 **Two figures in the design mockups do not reconcile,** and were not copied. The
 Home total of ₵3,938 counts the spa tip but not the fuel tip, while the same
