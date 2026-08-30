@@ -6,6 +6,44 @@ starts from them.
 
 ---
 
+## How to work through this brief
+
+**Two stages. Do not skip to stage two.**
+
+### Stage one — three directions, then stop
+
+Before designing any screen, present **three distinct visual directions.** Each
+one is a palette and a type pairing, nothing more — no screens yet.
+
+For each direction, show:
+
+- **The full palette** — around six to eight colours, as swatches with their hex
+  values, covering ground, surface, text, the accent, and the three semantic
+  states (spent, earned, moved). Show it in **both light and dark.**
+- **The type pairing** — display face and body face, set as real specimens at
+  the sizes they'd actually be used, including how a large amount like
+  **₵ 23,000.00** and a small one like **₵ 53.00** are set.
+- **A name and a sentence** — what this direction is, and why it suits an app
+  about money moving between a household and the people it supports.
+- **One small proof** — a single component, most usefully an account balance
+  card or one transaction row, so the palette can be judged doing real work
+  rather than as abstract swatches.
+
+Make the three genuinely different from one another. Three variations on the
+same idea is one direction, not three. They should represent real alternatives —
+different moods, different levels of boldness — so the choice is meaningful.
+
+Then **stop and wait.** Do not proceed until one is chosen.
+
+### Stage two — design everything in the chosen direction
+
+Once a direction is picked, design the full screen inventory in it. Apply the
+chosen palette and type consistently across every screen. If something about
+the direction turns out not to survive contact with a real screen, say so and
+propose the fix rather than quietly drifting to something else.
+
+---
+
 ## The product in one paragraph
 
 SpendLogX is a personal finance app for a household of two in Accra, Ghana,

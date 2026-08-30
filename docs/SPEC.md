@@ -234,7 +234,7 @@ approved screens rather than from guesses.
 
 | Stage | Contents |
 | --- | --- |
-| **Design** | Screen inventory → Claude Design → approved screens back. |
+| **Design** | Two stages: three palette/type directions to choose from, then the full screen inventory designed in the chosen one. |
 | **Scaffold** | Expo app, Drizzle schema, migrations both ends, import script, `Money` type, CI. Runs in parallel with design — none of it depends on visuals. |
 | **Build** | Capture, balances, transaction list, dashboard, people, net worth. Sync and household invite included. |
 | **Import & cutover** | Run the import, set opening balances by hand, stop using the sheet. |
