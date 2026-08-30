@@ -34,6 +34,12 @@ const PERSON_FACING = new Set(['Family', 'Extended Family', 'Charity', 'Loan Rep
 const ASSET_SUBCATEGORY = 'Land'
 const ASSET_ACCOUNT_NAME = 'Land'
 
+/**
+ * Asset accounts open before any recorded transaction, so their whole purchase
+ * history counts toward the cost basis.
+ */
+const ASSET_EPOCH = '2000-01-01'
+
 /** Descriptions that mark a smuggled-in opening balance rather than income. */
 const OPENING_BALANCE_HINTS = [/initial balance/i, /initial cash/i]
 
@@ -199,6 +205,9 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
   })
 
   const today = isoDate(new Date().toISOString().slice(0, 10))
+
+  // Spendable accounts open today: the user types what they actually hold, and
+  // the imported history is kept for the record without moving that figure.
   const accounts: Seed['accounts'] = [...accountNames].sort().map((name, i) => ({
     id: id('acct', name),
     name,
@@ -210,12 +219,16 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
     sortOrder: i,
   }))
 
+  // An asset account opens before all recorded history, because its balance is
+  // a cost basis — what has been put into it over time — not a figure anybody
+  // types in. Opening it today would show the land as having cost nothing. What
+  // the land is *worth* is a separate number, recorded in account_valuation.
   accounts.push({
     id: id('acct', ASSET_ACCOUNT_NAME),
     name: ASSET_ACCOUNT_NAME,
     kind: 'asset',
     openingBalanceMinor: 0,
-    openingBalanceOn: today,
+    openingBalanceOn: ASSET_EPOCH,
     sortOrder: accounts.length,
   })
   transforms.push(

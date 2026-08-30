@@ -70,9 +70,10 @@ describe('assertValid', () => {
 })
 
 describe('balances', () => {
+  const OPENS = isoDate('2026-01-01')
   const accounts = [
-    { id: 'cash', openingBalance: c('1042') },
-    { id: 'stanbic', openingBalance: c('7000.47') },
+    { id: 'cash', openingBalance: c('1042'), openingBalanceOn: OPENS },
+    { id: 'stanbic', openingBalance: c('7000.47'), openingBalanceOn: OPENS },
   ]
 
   it('is the opening balance plus every effect', () => {
@@ -89,10 +90,40 @@ describe('balances', () => {
   })
 
   it('lets a balance go negative rather than quietly clamping', () => {
-    const out = balances([{ id: 'cash', openingBalance: c('10') }], [
+    const out = balances([{ id: 'cash', openingBalance: c('10'), openingBalanceOn: isoDate('2026-01-01') }], [
       txn({ type: 'expense', amount: c('50'), accountId: 'cash' }),
     ])
     expect(out.get('cash')).toBe(c('-40'))
+  })
+
+  it('ignores transactions from before the opening balance date', () => {
+    // The hand-entered balance already reflects them; replaying the imported
+    // history on top would put the account out by the whole import.
+    const out = balances(
+      [{ id: 'cash', openingBalance: c('500'), openingBalanceOn: isoDate('2026-08-30') }],
+      [
+        txn({ type: 'expense', amount: c('200'), accountId: 'cash', occurredOn: isoDate('2026-05-04') }),
+        txn({ type: 'expense', amount: c('50'), accountId: 'cash', occurredOn: isoDate('2026-08-30') }),
+        txn({ type: 'expense', amount: c('25'), accountId: 'cash', occurredOn: isoDate('2026-09-01') }),
+      ],
+    )
+    expect(out.get('cash')).toBe(c('425'))
+  })
+
+  it('applies the cutoff per account, not per transaction', () => {
+    // A transfer can be history for one side and current for the other.
+    const out = balances(
+      [
+        { id: 'old', openingBalance: c('100'), openingBalanceOn: isoDate('2026-01-01') },
+        { id: 'new', openingBalance: c('100'), openingBalanceOn: isoDate('2026-09-01') },
+      ],
+      [txn({
+        type: 'transfer', amount: c('40'), accountId: 'old', counterAccountId: 'new',
+        occurredOn: isoDate('2026-06-01'),
+      })],
+    )
+    expect(out.get('old')).toBe(c('60'))
+    expect(out.get('new')).toBe(c('100'))
   })
 
   it('refuses a transaction against an account it does not know', () => {

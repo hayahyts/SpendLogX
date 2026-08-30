@@ -11,6 +11,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { parseCedis as c } from '../src/domain/money'
 import { isoDate, periodContaining } from '../src/domain/period'
 import { type Txn, balances, effects, spendByCategory, spendByPerson, totalsForPeriod } from '../src/domain/ledger'
+import { type ValuedAccount, assetPositions, netWorth } from '../src/domain/networth'
 import { type Report, type Seed, decodeHidden, importWorkbook, isHidden } from './import-workbook'
 
 const WORKBOOK = path.join(__dirname, '..', 'docs', 'Spending_Tracker_GHS.xlsx')
@@ -181,7 +182,9 @@ describe('the imported ledger is internally consistent', () => {
   })
 
   it('touches only accounts that exist', () => {
-    const accounts = seed.accounts.map((a) => ({ id: a.id, openingBalance: c('0') }))
+    const accounts = seed.accounts.map((a) => ({
+      id: a.id, openingBalance: c('0'), openingBalanceOn: isoDate(a.openingBalanceOn),
+    }))
     expect(() => balances(accounts, asTxns())).not.toThrow()
   })
 
@@ -208,5 +211,52 @@ describe('the report', () => {
 
   it('lists every transform it applied', () => {
     expect(report.transforms.length).toBeGreaterThan(30)
+  })
+})
+
+describe('land as an asset, on the real data', () => {
+  /** Seed accounts with the kind the net-worth layer needs. */
+  function asAccounts(): ValuedAccount[] {
+    return seed.accounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      kind: a.kind as ValuedAccount['kind'],
+      openingBalance: c(String(a.openingBalanceMinor / 100)),
+      openingBalanceOn: isoDate(a.openingBalanceOn),
+    }))
+  }
+
+  const asOf = isoDate('2026-12-31')
+
+  it('holds Land at its 27,500 cost basis until somebody values it', () => {
+    // Cost basis is history, so it counts every purchase regardless of setup date.
+    const [land] = assetPositions(
+      asAccounts().map((a) => ({ ...a, openingBalanceOn: isoDate('2020-01-01') })),
+      asTxns(), [], asOf,
+    )
+    expect(land).toMatchObject({ name: 'Land', costBasis: c('27500'), unvalued: true })
+  })
+
+  it('holds the asset at cost while leaving spendable balances alone', () => {
+    const nw = netWorth(asAccounts(), asTxns(), [], asOf)
+    expect(nw.assets).toBe(c('27500'))
+    // Every imported row predates setup, so none of it moves a balance the
+    // user typed in. Spendable is exactly the hand-entered figures, which are
+    // zero until first run.
+    expect(nw.spendable).toBe(c('0'))
+  })
+
+  it('reports an unrealised gain once the land is valued', () => {
+    const nw = netWorth(asAccounts().map((a) => ({ ...a, openingBalanceOn: isoDate('2020-01-01') })), asTxns(), [
+      { accountId: seed.accounts.find((a) => a.name === 'Land')!.id,
+        asOf: isoDate('2026-08-01'), value: c('42000') },
+    ], asOf)
+    expect(nw.assets).toBe(c('42000'))
+    expect(nw.unrealisedGain).toBe(c('14500'))
+  })
+
+  it('never counts the land twice', () => {
+    const nw = netWorth(asAccounts(), asTxns(), [], asOf)
+    expect(nw.total).toBe(nw.spendable + nw.assets)
   })
 })

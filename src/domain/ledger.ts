@@ -99,15 +99,34 @@ export function effects(txn: Txn): AccountEffect[] {
 
 export interface Account {
   id: string
+  /** What the account held on `openingBalanceOn`, entered by hand at setup. */
   openingBalance: Money
+  /**
+   * The date the opening balance is true as of. Transactions before it are
+   * history and do not move the balance — they are already reflected in the
+   * figure that was typed in.
+   *
+   * This matters because the imported spreadsheet history predates setup. Left
+   * unfiltered, replaying those 40 rows on top of a hand-entered balance would
+   * put every account out by the whole of the import.
+   */
+  openingBalanceOn: IsoDate
 }
 
-/** Opening balance plus every effect, for each account. */
+/**
+ * Each account's opening balance, plus the effects of transactions on or after
+ * the date that balance is true as of.
+ *
+ * The cutoff is per account, not per transaction: a transfer can be history for
+ * one side and current for the other if the two accounts were set up on
+ * different days.
+ */
 export function balances(
   accounts: readonly Account[],
   txns: readonly Txn[],
 ): Map<string, Money> {
   const out = new Map<string, Money>(accounts.map((a) => [a.id, a.openingBalance]))
+  const from = new Map<string, IsoDate>(accounts.map((a) => [a.id, a.openingBalanceOn]))
 
   for (const txn of txns) {
     for (const effect of effects(txn)) {
@@ -115,6 +134,8 @@ export function balances(
       if (current === undefined) {
         throw new LedgerError(`Transaction ${txn.id} touches unknown account ${effect.accountId}`)
       }
+      const opensOn = from.get(effect.accountId)
+      if (opensOn !== undefined && txn.occurredOn < opensOn) continue
       out.set(effect.accountId, add(current, effect.delta))
     }
   }
