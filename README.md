@@ -51,10 +51,11 @@ Run `npm run import` to see the full report. The substance of it:
 
 | | Sheet | After import |
 | --- | --- | --- |
-| Expenses | ₵48,943 | **₵21,443** — the land purchase is a transfer, not spending |
+| Expenses | ₵48,943 | **₵9,844** — land purchases and the loan repayment are transfers, not spending |
 | Income | ₵49,889.47 | **₵41,847** — opening balances no longer booked as salary |
 | Categories charted | 12 of 13 | **all 13** |
 | People | subcategories | **18, as their own dimension** |
+| Money owed | invisible | **a liability account**, subtracted from net worth |
 
 Twenty-nine rows share the date `2026-05-04` — the old entry form's default.
 They import unchanged, by decision; the report warns about them.

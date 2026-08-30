@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { parseCedis as c, ZERO } from './money'
 import { isoDate } from './period'
-import type { Txn } from './ledger'
+import { type Txn, spendAmount } from './ledger'
 import {
   type ValuedAccount, type Valuation, assertValidValuation, assetPositions,
-  gainBasisPoints, isStale, netWorth, netWorthOver, valuationAt,
+  gainBasisPoints, isLiability, isSpendable, isStale, liabilityPositions,
+  netWorth, netWorthOver, valuationAt,
 } from './networth'
 
 const d = isoDate
@@ -235,5 +236,70 @@ describe('assertValidValuation', () => {
     expect(() =>
       assertValidValuation({ accountId: 'land', asOf: d('2026-06-01'), value: ZERO }),
     ).not.toThrow()
+  })
+})
+
+describe('liabilities', () => {
+  /** A debt of 11,599 opens as a negative balance and is repaid up to zero. */
+  const withDebt: ValuedAccount[] = [
+    ...accounts,
+    {
+      id: 'loan', name: 'Loan from Beb', kind: 'liability',
+      openingBalance: c('-11599'), openingBalanceOn: d('2026-01-01'),
+    },
+  ]
+
+  const repayment = txn({
+    type: 'transfer', amount: c('11599'),
+    accountId: 'stanbic', counterAccountId: 'loan', occurredOn: d('2026-06-30'),
+  })
+
+  it('is neither spendable nor an asset', () => {
+    const loan = withDebt.find((a) => a.kind === 'liability')!
+    expect(isSpendable(loan)).toBe(false)
+    expect(isLiability(loan)).toBe(true)
+    expect(assetPositions(withDebt, [], [], d('2026-12-31'))).toHaveLength(1)
+  })
+
+  it('reports what is owed as a positive figure', () => {
+    const [debt] = liabilityPositions(withDebt, [], d('2026-06-01'))
+    expect(debt).toMatchObject({ name: 'Loan from Beb', owed: c('11599'), settled: false })
+  })
+
+  it('is cleared by repaying it', () => {
+    const [debt] = liabilityPositions(withDebt, [repayment], d('2026-12-31'))
+    expect(debt).toMatchObject({ owed: ZERO, settled: true })
+  })
+
+  it('never reports a negative debt after an overpayment', () => {
+    const over = txn({
+      type: 'transfer', amount: c('15000'),
+      accountId: 'stanbic', counterAccountId: 'loan', occurredOn: d('2026-06-30'),
+    })
+    const [debt] = liabilityPositions(withDebt, [over], d('2026-12-31'))
+    expect(debt?.owed).toBe(ZERO)
+    expect(debt?.settled).toBe(true)
+  })
+
+  it('subtracts from net worth', () => {
+    const clear = netWorth(accounts, [], [], d('2026-06-01'))
+    const owing = netWorth(withDebt, [], [], d('2026-06-01'))
+    expect(owing.liabilities).toBe(c('11599'))
+    expect(clear.total - owing.total).toBe(c('11599'))
+  })
+
+  it('leaves net worth unchanged when a debt is repaid', () => {
+    // Money moves from the bank to the debt; nothing is created or destroyed.
+    const before = netWorth(withDebt, [], [], d('2026-06-29'))
+    const after = netWorth(withDebt, [repayment], [], d('2026-06-30'))
+    expect(after.total).toBe(before.total)
+    expect(after.spendable).toBe(before.spendable - c('11599'))
+    expect(after.liabilities).toBe(ZERO)
+  })
+
+  it('does not count a repayment as spending', () => {
+    // This is the whole point: 11,599 of debt service was 54% of the sheet's
+    // "real" spending figure.
+    expect(spendAmount(repayment)).toBe(ZERO)
   })
 })

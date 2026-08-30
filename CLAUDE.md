@@ -46,20 +46,34 @@ check constraints.
 Accra is UTC+0 so nothing breaks today, but the type stops a future timezone
 moving somebody's spending into the previous month.
 
-**An opening balance means two different things,** deliberately:
+**An opening balance means different things by account kind,** deliberately:
 
 - A **wallet** (cash, mobile money, bank) holds what you have *now*. It opens
   at setup, and imported history before that date does not move it.
 - An **asset** (Land) holds a *cost basis*, which accumulates over time. It
   opens before all history, or the ₵27,500 of land reads as having cost
   nothing. What it is *worth* is separate, in `account_valuation`.
+- A **liability** (Loan from Beb) holds what is *still owed*, as a **negative**
+  balance: a debt of ₵11,599 opens at `-1159900` and repayments move it up
+  toward zero. Storing the sign this way means `effects()` and `balances()`
+  need no notion of debt — repaying is an ordinary transfer — and net worth
+  simply adds every balance together. It opens at setup, like a wallet.
 
 `balances()` applies this cutoff per account, so a transfer can be history on
 one side and current on the other.
 
 **Net worth counts assets at valuation, never at ledger balance.** Doing both
 double-counts. An unvalued asset falls back to its cost basis and flags itself
-`unvalued` — showing land as worth zero would be the worse lie.
+`unvalued` — showing land as worth zero would be the worse lie. Net worth is
+`spendable + assets − liabilities`.
+
+**Buying an asset and repaying a debt are transfers, not spending.** Neither is
+consumption. Together they were ₵39,099 of the sheet's ₵48,943, which is why
+the spending figure fell to ₵9,844.
+
+A transfer counts on a side only if it falls on or after that account's opening
+date. Mixing opening dates across the two sides of one transfer therefore moves
+net worth — correct, but surprising, and it has already broken a test.
 
 ## Layout
 
@@ -93,15 +107,19 @@ Quoted often, and each is checked by a test:
 
 | | |
 | --- | --- |
-| Real spending | ₵21,443 — the sheet claimed ₵48,943 |
+| Real consumption | ₵9,844 — the sheet claimed ₵48,943 |
 | Real income | ₵41,847 — the sheet claimed ₵49,889.47 |
-| Land, at cost | ₵27,500 across 4 purchases |
+| Land, at cost | ₵27,500 across 4 purchases — a transfer, not spending |
+| Loan repaid to Beb | ₵11,599 — a transfer into a liability, not spending |
 | Family spending the dashboard hid | ₵3,541 |
-| Conflated under the name "Beb" | ₵13,874 — ₵2,275 of family spending plus an ₵11,599 loan |
+| Conflated under the name "Beb" | ₵13,874 in the sheet — ₵2,275 of family spending plus an ₵11,599 loan repayment, now separated |
 | Rows carrying the old form's default date | 29 of 40, imported unchanged by decision |
 
 ## Open
 
-**Liabilities are not modelled.** The ₵11,599 repayment to Beb is money owed,
-not money spent. A `liability` account kind is nearly free given asset accounts
-exist. Undecided.
+**The "Loan Repayment" category now has no transactions.** Repayments are
+transfers into a liability account, so the category survives only as a trap for
+anyone who logs the next one as an expense. Archive it, or keep it? Undecided.
+
+**The asset epoch is a hardcoded `2000-01-01`.** Deriving it from the earliest
+transaction would be tidier.

@@ -40,11 +40,20 @@ const ASSET_ACCOUNT_NAME = 'Land'
  */
 const ASSET_EPOCH = '2000-01-01'
 
+/**
+ * Repaying a loan is money owed being cleared, not money consumed. The category
+ * that recorded it becomes a liability account, and the repayment a transfer
+ * into it. What is still owed is entered by hand at setup, so the account opens
+ * today like a wallet does.
+ */
+const LIABILITY_CATEGORY = 'Loan Repayment'
+const LIABILITY_ACCOUNT_NAME = 'Loan from Beb'
+
 /** Descriptions that mark a smuggled-in opening balance rather than income. */
 const OPENING_BALANCE_HINTS = [/initial balance/i, /initial cash/i]
 
 /** Payment Method duplicated Account in 37 of 40 rows; Account wins. */
-const ACCOUNT_KIND: Record<string, 'cash' | 'mobile_money' | 'bank' | 'asset'> = {
+const ACCOUNT_KIND: Record<string, 'cash' | 'mobile_money' | 'bank' | 'asset' | 'liability'> = {
   Cash: 'cash',
   'MoMo Wallet': 'mobile_money',
   'Stanbic Bank': 'bank',
@@ -99,6 +108,12 @@ function readDate(cell: ExcelJS.Cell): IsoDate {
   const v = cell.value
   if (v instanceof Date) return isoDate(v.toISOString().slice(0, 10))
   throw new Error(`Expected a date, got ${JSON.stringify(v)}`)
+}
+
+function addOneDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
 }
 
 function readMoney(cell: ExcelJS.Cell): Money {
@@ -198,16 +213,28 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
 
   // --- accounts -------------------------------------------------------------
   const accountNames = new Set<string>()
+  const seenTxnDates = new Set<string>()
   transactions.eachRow((row, n) => {
     if (n === 1) return
     const name = readText(row.getCell('J')).value
     if (name) accountNames.add(name)
+    seenTxnDates.add(readDate(row.getCell('B')))
   })
 
-  const today = isoDate(new Date().toISOString().slice(0, 10))
+  // The day after the last imported transaction, not today's date.
+  //
+  // Wallets and liabilities open where the imported history ends, so every
+  // imported row is history and none of it moves a balance the user types in.
+  // Deriving it from the data rather than the clock also keeps the seed
+  // reproducible — CI re-runs this import and fails if the output moves, which
+  // a baked-in `new Date()` would trigger every single day.
+  //
+  // At real setup the app writes the actual date; this is only the seed's value.
+  const lastTxnDate = [...seenTxnDates].sort().at(-1)
+  const setupDate = lastTxnDate === undefined ? ASSET_EPOCH : addOneDay(lastTxnDate)
 
-  // Spendable accounts open today: the user types what they actually hold, and
-  // the imported history is kept for the record without moving that figure.
+  // Spendable accounts open where history ends: the user types what they
+  // actually hold, and the imported rows do not move that figure.
   const accounts: Seed['accounts'] = [...accountNames].sort().map((name, i) => ({
     id: id('acct', name),
     name,
@@ -215,7 +242,7 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
     // Deliberately zero: balances are entered by hand at first run, so nothing
     // here pretends the imported history reconciles to a real balance.
     openingBalanceMinor: 0,
-    openingBalanceOn: today,
+    openingBalanceOn: setupDate,
     sortOrder: i,
   }))
 
@@ -241,8 +268,24 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
     'Opening balances left at zero: they are entered by hand at first run rather than inferred from the sheet',
   )
 
+  // A liability opens today, not before history: what is still owed is a figure
+  // the user types at setup, exactly as a wallet balance is. Its balance is
+  // negative until cleared, so net worth can simply add every account up.
+  accounts.push({
+    id: id('acct', LIABILITY_ACCOUNT_NAME),
+    name: LIABILITY_ACCOUNT_NAME,
+    kind: 'liability',
+    openingBalanceMinor: 0,
+    openingBalanceOn: setupDate,
+    sortOrder: accounts.length,
+  })
+  transforms.push(
+    `Created liability account "${LIABILITY_ACCOUNT_NAME}" — repaying a loan clears a debt rather than spending money`,
+  )
+
   const accountId = new Map(accounts.map((a) => [a.name, a.id]))
   const landAccountId = id('acct', ASSET_ACCOUNT_NAME)
+  const liabilityAccountId = id('acct', LIABILITY_ACCOUNT_NAME)
 
   // --- transactions ---------------------------------------------------------
   const txns: Seed['txns'] = []
@@ -297,6 +340,28 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
       assetPurchases = pesewas(assetPurchases + amount)
       transforms.push(
         `Row ${legacyRowId}: ${format(amount)} land purchase reclassified from expense to a transfer into ${ASSET_ACCOUNT_NAME}`,
+      )
+      return
+    }
+
+    // Loan Repayment -> a transfer into the liability account. The person stays
+    // attached: it changes no total, since transfers are not spending, but it
+    // keeps the repayment in the history of dealings with that person.
+    if (catName === LIABILITY_CATEGORY) {
+      let lender: string | null = null
+      if (sub.value && (PEOPLE.has(sub.value) || sub.recovered)) {
+        peopleNames.add(sub.value)
+        lender = id('person', sub.value)
+      }
+      txns.push({
+        id: id('txn', legacyRowId), type: 'transfer', occurredOn,
+        amountMinor: amount, tipsMinor: 0, feeMinor: 0,
+        accountId: account, counterAccountId: liabilityAccountId,
+        categoryId: null, personId: lender, note, isOpening: false, legacyRowId,
+      })
+      transfers = pesewas(transfers + amount)
+      transforms.push(
+        `Row ${legacyRowId}: ${format(amount)} repayment reclassified from expense to a transfer into ${LIABILITY_ACCOUNT_NAME} — it is money owed, not money spent`,
       )
       return
     }

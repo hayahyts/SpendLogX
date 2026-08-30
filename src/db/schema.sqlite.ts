@@ -43,9 +43,20 @@ export const account = sqliteTable(
     id: text('id').primaryKey(),
     householdId: text('household_id').notNull().references(() => household.id),
     name: text('name').notNull(),
-    /** 'asset' is Land: it holds value but is not spendable. */
-    kind: text('kind', { enum: ['cash', 'mobile_money', 'bank', 'asset'] }).notNull(),
-    /** Pesewas. Entered by hand at first run, not derived from the spreadsheet. */
+    /**
+     * 'asset' is Land: it holds value but is not spendable.
+     * 'liability' is money owed: its balance is negative until it is cleared.
+     */
+    kind: text('kind', {
+      enum: ['cash', 'mobile_money', 'bank', 'asset', 'liability'],
+    }).notNull(),
+    /**
+     * Pesewas. Entered by hand at first run, not derived from the spreadsheet.
+     *
+     * Negative on a liability: an account holding a debt of 11,599 opens at
+     * -1159900, so repaying it moves the balance up toward zero and net worth
+     * can simply add it. No sign flipping anywhere else.
+     */
     openingBalanceMinor: integer('opening_balance_minor').notNull().default(0),
     openingBalanceOn: text('opening_balance_on').notNull(),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),

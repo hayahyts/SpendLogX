@@ -11,7 +11,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { parseCedis as c } from '../src/domain/money'
 import { isoDate, periodContaining } from '../src/domain/period'
 import { type Txn, balances, effects, spendByCategory, spendByPerson, totalsForPeriod } from '../src/domain/ledger'
-import { type ValuedAccount, assetPositions, netWorth } from '../src/domain/networth'
+import { type ValuedAccount, assetPositions, liabilityPositions, netWorth } from '../src/domain/networth'
 import { type Report, type Seed, decodeHidden, importWorkbook, isHidden } from './import-workbook'
 
 const WORKBOOK = path.join(__dirname, '..', 'docs', 'Spending_Tracker_GHS.xlsx')
@@ -95,8 +95,10 @@ describe('land stops being spending', () => {
     expect(intoLand.reduce((sum, t) => sum + t.amountMinor, 0)).toBe(c('27500'))
   })
 
-  it('drops true spending to 21,443 — the sheet claimed 48,943', () => {
-    expect(report.totals.expenses).toBe('₵ 21,443.00')
+  it('drops true spending to 9,844 — the sheet claimed 48,943', () => {
+    // 48,943 less 27,500 of land and 11,599 of loan repayment, neither of
+    // which is consumption.
+    expect(report.totals.expenses).toBe('₵ 9,844.00')
   })
 })
 
@@ -111,6 +113,16 @@ describe('opening balances stop being income', () => {
 
   it('leaves every account opening balance at zero, to be set by hand', () => {
     expect(seed.accounts.every((a) => a.openingBalanceMinor === 0)).toBe(true)
+  })
+
+  it('opens wallets where the imported history ends, not on the clock', () => {
+    // A baked-in new Date() would change the seed daily and fail the CI check
+    // that re-runs this import and diffs the committed output.
+    const latest = seed.txns.map((t) => t.occurredOn).sort().at(-1)
+    for (const account of seed.accounts) {
+      if (account.kind === 'asset') continue
+      expect(account.openingBalanceOn > (latest ?? '')).toBe(true)
+    }
   })
 })
 
@@ -139,7 +151,9 @@ describe('people become their own dimension', () => {
     expect(categories.size).toBeGreaterThan(1)
 
     const year = periodContaining('year', isoDate('2026-01-01'))
-    expect(spendByPerson(asTxns(), year).get(beb?.id ?? '')).toBe(c('13874'))
+    // 2,275 of family spending. The 11,599 repayment is a transfer into the
+    // liability account, so it is money owed being cleared, not spending.
+    expect(spendByPerson(asTxns(), year).get(beb?.id ?? '')).toBe(c('2275'))
   })
 
   it('never leaves a person as a category', () => {
@@ -258,5 +272,81 @@ describe('land as an asset, on the real data', () => {
   it('never counts the land twice', () => {
     const nw = netWorth(asAccounts(), asTxns(), [], asOf)
     expect(nw.total).toBe(nw.spendable + nw.assets)
+  })
+})
+
+describe('the loan repayment stops being spending', () => {
+  function asAccounts(): ValuedAccount[] {
+    return seed.accounts.map((a) => ({
+      id: a.id, name: a.name, kind: a.kind as ValuedAccount['kind'],
+      openingBalance: c(String(a.openingBalanceMinor / 100)),
+      openingBalanceOn: isoDate(a.openingBalanceOn),
+    }))
+  }
+
+  it('creates a liability account for what was owed', () => {
+    const loan = seed.accounts.find((a) => a.kind === 'liability')
+    expect(loan?.name).toBe('Loan from Beb')
+    // Opens today at zero: what is still owed is typed in at setup.
+    expect(loan?.openingBalanceMinor).toBe(0)
+  })
+
+  it('turns the 11,599 repayment into a transfer into it', () => {
+    const loan = seed.accounts.find((a) => a.kind === 'liability')
+    const into = seed.txns.filter((t) => t.counterAccountId === loan?.id)
+    expect(into).toHaveLength(1)
+    expect(into[0]).toMatchObject({ type: 'transfer', amountMinor: c('11599'), categoryId: null })
+  })
+
+  it('keeps the lender on the transfer, without counting it as spending', () => {
+    const beb = seed.people.find((p) => p.name === 'Beb')
+    const loan = seed.accounts.find((a) => a.kind === 'liability')
+    const repayment = seed.txns.find((t) => t.counterAccountId === loan?.id)
+    expect(repayment?.personId).toBe(beb?.id)
+  })
+
+  it('leaves consumption at 9,844 rather than 21,443', () => {
+    expect(report.totals.expenses).toBe('₵ 9,844.00')
+  })
+
+  it('reports nothing owed until a figure is entered at setup', () => {
+    const debts = liabilityPositions(asAccounts(), asTxns(), isoDate('2026-12-31'))
+    expect(debts).toHaveLength(1)
+    expect(debts[0]?.owed).toBe(c('0'))
+  })
+
+  it('shows the debt clearing once the opening figure is set', () => {
+    // Every account opens from the same date here, or the transfer counts on
+    // one side only and net worth jumps by 11,599 out of nowhere.
+    const accounts = asAccounts().map((a) => ({
+      ...a,
+      openingBalance: a.kind === 'liability' ? c('-11599') : a.openingBalance,
+      openingBalanceOn: isoDate('2026-01-01'),
+    }))
+    const asOf = isoDate('2026-12-31')
+
+    expect(netWorth(accounts, [], [], isoDate('2026-01-01')).liabilities).toBe(c('11599'))
+    expect(netWorth(accounts, asTxns(), [], asOf).liabilities).toBe(c('0'))
+  })
+
+  it('leaves net worth untouched by the repayment itself', () => {
+    // Isolate the repayment rather than comparing two dates: 30 June also
+    // carries a 300 expense, which would otherwise be read as the difference.
+    const accounts = asAccounts().map((a) => ({
+      ...a,
+      openingBalance: a.kind === 'liability' ? c('-11599') : a.openingBalance,
+      openingBalanceOn: isoDate('2026-01-01'),
+    }))
+    const loan = seed.accounts.find((a) => a.kind === 'liability')
+    const all = asTxns()
+    const withoutRepayment = all.filter((t) => t.counterAccountId !== loan?.id)
+    const asOf = isoDate('2026-12-31')
+
+    expect(all.length - withoutRepayment.length).toBe(1)
+    // Paying it moves 11,599 out of the bank and shrinks the debt by 11,599.
+    // Nothing is created or destroyed, so the total does not move.
+    expect(netWorth(accounts, all, [], asOf).total).toBe(
+      netWorth(accounts, withoutRepayment, [], asOf).total,
+    )
   })
 })

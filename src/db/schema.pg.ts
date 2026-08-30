@@ -42,7 +42,9 @@ export const account = pgTable(
     id: text('id').primaryKey(),
     householdId: text('household_id').notNull().references(() => household.id),
     name: text('name').notNull(),
-    kind: text('kind', { enum: ['cash', 'mobile_money', 'bank', 'asset'] }).notNull(),
+    kind: text('kind', {
+      enum: ['cash', 'mobile_money', 'bank', 'asset', 'liability'],
+    }).notNull(),
     openingBalanceMinor: integer('opening_balance_minor').notNull().default(0),
     openingBalanceOn: date('opening_balance_on').notNull(),
     isActive: boolean('is_active').notNull().default(true),

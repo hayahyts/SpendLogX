@@ -59,7 +59,7 @@ tips), income **49,889.47**, transfers **10,611.00**.
 | **`Payment Method` is deleted. `Account` carries the meaning.** Each account has a kind (cash / mobile money / bank / asset). | Keeping both — the data shows no real distinction in 37 of 40 rows. |
 | **Transfers are two-sided: from → to, plus a fee field.** The fee captures MoMo cash-out charges so balances reconcile. | Single-sided transfers — they make balances impossible. |
 | **Household with two members, shared pot.** You and Beb. | Single-user — would need a schema rewrite later, not a migration. |
-| **Land becomes an asset account with tracked value.** Buying land is a transfer, not an expense. True spend drops from 48,943 to 21,443. | Leaving it as an expense — one land purchase would dominate every chart and average forever. |
+| **Land becomes an asset account with tracked value,** and money owed becomes a liability account. Buying land and repaying a loan are both transfers, not expenses. True consumption drops from 48,943 to 9,844. | Leaving it as an expense — one land purchase would dominate every chart and average forever. |
 | **People are a first-class dimension**, separate from category. | People-as-subcategories — that is precisely what causes the `Beb` collision. |
 | **Import all 40 rows as-is, including the 29 default dates.** | Flagging or dropping them. Accepted limitation: pre-July 2026 charts are shaped by one backfill day. |
 | **Tips survives, behind a "More" disclosure.** | Prominent field — GHS 90 across two months doesn't earn a tap on every entry. |
@@ -262,9 +262,10 @@ Say the word if any of these are wrong.
 
 ## 9. Open questions
 
-1. **Liabilities are not modelled.** The 11,599 repayment to Beb is money owed,
-   not money spent. A `liability` account kind is nearly free given we already
-   have asset accounts. Worth doing?
+1. ~~Liabilities are not modelled.~~ **Done.** A `liability` account kind
+   holds what is owed as a negative balance; the 11,599 repayment is a transfer
+   into it. Spending fell from 21,443 to **9,844**, since 54% of it was debt
+   service. What is still owed is entered by hand at setup.
 2. Recurring transactions — rent and salary are obvious candidates.
 3. Receipt photos.
 4. Reminders / notifications to log.

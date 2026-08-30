@@ -9,7 +9,7 @@
       "name": "Cash",
       "kind": "cash",
       "openingBalanceMinor": 0,
-      "openingBalanceOn": "2026-08-30",
+      "openingBalanceOn": "2026-07-02",
       "sortOrder": 0
     },
     {
@@ -17,7 +17,7 @@
       "name": "MoMo Wallet",
       "kind": "mobile_money",
       "openingBalanceMinor": 0,
-      "openingBalanceOn": "2026-08-30",
+      "openingBalanceOn": "2026-07-02",
       "sortOrder": 1
     },
     {
@@ -25,7 +25,7 @@
       "name": "Stanbic Bank",
       "kind": "bank",
       "openingBalanceMinor": 0,
-      "openingBalanceOn": "2026-08-30",
+      "openingBalanceOn": "2026-07-02",
       "sortOrder": 2
     },
     {
@@ -35,6 +35,14 @@
       "openingBalanceMinor": 0,
       "openingBalanceOn": "2000-01-01",
       "sortOrder": 3
+    },
+    {
+      "id": "acct_026adef1da9e",
+      "name": "Loan from Beb",
+      "kind": "liability",
+      "openingBalanceMinor": 0,
+      "openingBalanceOn": "2026-07-02",
+      "sortOrder": 4
     }
   ],
   "categories": [
@@ -735,14 +743,14 @@
     },
     {
       "id": "txn_fe5dbbcea5ce",
-      "type": "expense",
+      "type": "transfer",
       "occurredOn": "2026-06-30",
       "amountMinor": 1159900,
       "tipsMinor": 0,
       "feeMinor": 0,
       "accountId": "acct_082d019b7e12",
-      "counterAccountId": null,
-      "categoryId": "cat_e49d540e0ee7",
+      "counterAccountId": "acct_026adef1da9e",
+      "categoryId": null,
       "personId": "person_0ba3e0595122",
       "note": "Repayment of loan",
       "isOpening": false,

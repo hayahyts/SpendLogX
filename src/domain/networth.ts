@@ -12,7 +12,7 @@ import { type Money, ZERO, add, pesewas, subtract, sum } from './money'
 import type { IsoDate } from './period'
 import { type Account, type Txn, balances } from './ledger'
 
-export type AccountKind = 'cash' | 'mobile_money' | 'bank' | 'asset'
+export type AccountKind = 'cash' | 'mobile_money' | 'bank' | 'asset' | 'liability'
 
 export interface ValuedAccount extends Account {
   name: string
@@ -28,7 +28,15 @@ export interface Valuation {
 }
 
 export function isSpendable(account: Pick<ValuedAccount, 'kind'>): boolean {
-  return account.kind !== 'asset'
+  return account.kind !== 'asset' && account.kind !== 'liability'
+}
+
+export function isAsset(account: Pick<ValuedAccount, 'kind'>): boolean {
+  return account.kind === 'asset'
+}
+
+export function isLiability(account: Pick<ValuedAccount, 'kind'>): boolean {
+  return account.kind === 'liability'
 }
 
 /**
@@ -83,7 +91,7 @@ export function assetPositions(
   const ledger = balances(accounts, txns.filter((t) => t.occurredOn <= asOf))
 
   return accounts
-    .filter((a) => !isSpendable(a))
+    .filter(isAsset)
     .map((account) => {
       const costBasis = ledger.get(account.id) ?? ZERO
       const valuation = valuationAt(valuations, account.id, asOf)
@@ -100,6 +108,38 @@ export function assetPositions(
     })
 }
 
+export interface LiabilityPosition {
+  accountId: string
+  name: string
+  /** What is still owed, as a positive figure. Zero once cleared. */
+  owed: Money
+  /** True once the debt is settled, or overpaid. */
+  settled: boolean
+}
+
+/**
+ * Everything still owed.
+ *
+ * A liability account carries a negative balance — a debt of 11,599 opens at
+ * -11,599 and repayments move it up toward zero — so `owed` is simply its
+ * balance negated. Storing it this way means `balances()` and `effects()` need
+ * no idea that liabilities exist: repaying is an ordinary transfer into the
+ * account, and net worth just adds every balance up.
+ */
+export function liabilityPositions(
+  accounts: readonly ValuedAccount[],
+  txns: readonly Txn[],
+  asOf: IsoDate,
+): LiabilityPosition[] {
+  const ledger = balances(accounts, txns.filter((t) => t.occurredOn <= asOf))
+
+  return accounts.filter(isLiability).map((account) => {
+    const balance = ledger.get(account.id) ?? ZERO
+    const owed = pesewas(Math.max(0, -balance))
+    return { accountId: account.id, name: account.name, owed, settled: owed === 0 }
+  })
+}
+
 export interface NetWorth {
   /** Cash, mobile money and bank balances. What could be spent today. */
   spendable: Money
@@ -111,14 +151,18 @@ export interface NetWorth {
   assetCostBasis: Money
   /** assets − assetCostBasis, across every asset. */
   unrealisedGain: Money
+  /** Everything still owed, as a positive figure. */
+  liabilities: Money
   positions: AssetPosition[]
+  debts: LiabilityPosition[]
 }
 
 /**
- * Spendable balances plus assets at value.
+ * Spendable balances, plus assets at value, less what is owed.
  *
  * Asset accounts contribute their *valuation*, never their ledger balance, so
- * nothing is counted twice.
+ * nothing is counted twice. Liabilities are subtracted, which is the only
+ * reason this number differs from what the accounts alone would suggest.
  */
 export function netWorth(
   accounts: readonly ValuedAccount[],
@@ -137,13 +181,18 @@ export function netWorth(
   const assets = sum(positions.map((p) => p.value))
   const assetCostBasis = sum(positions.map((p) => p.costBasis))
 
+  const debts = liabilityPositions(accounts, upTo, asOf)
+  const liabilities = sum(debts.map((d) => d.owed))
+
   return {
     spendable,
     assets,
-    total: add(spendable, assets),
+    total: subtract(add(spendable, assets), liabilities),
     assetCostBasis,
     unrealisedGain: subtract(assets, assetCostBasis),
+    liabilities,
     positions,
+    debts,
   }
 }
 
