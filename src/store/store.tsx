@@ -50,13 +50,28 @@ export interface Person {
 
 export interface Member {
   id: string
+  /**
+   * The Supabase auth user id, and what every row-level security policy on the
+   * server compares against. Holds a local id until this phone signs in, so
+   * the app is usable with no account at all.
+   */
+  userId: string
   name: string
   email: string
   role: 'owner' | 'member'
   isCurrentUser: boolean
 }
 
+export interface Household {
+  id: string
+  name: string
+  /** Six characters the second phone types to join. */
+  inviteCode: string | null
+}
+
 export interface State {
+  /** Null until onboarding has run, which is what gates a fresh install. */
+  household: Household | null
   accounts: Account[]
   categories: Category[]
   people: Person[]
@@ -79,7 +94,17 @@ export type Action =
   | { type: 'renameCategory'; id: string; name: string }
   | { type: 'archiveCategory'; id: string; archived: boolean }
   | { type: 'addCategory'; category: Category }
-  | { type: 'completeOnboarding'; householdName: string; member: Member }
+  | {
+      type: 'completeOnboarding'
+      householdId: string
+      householdName: string
+      inviteCode: string
+      member: Member
+    }
+  /** Sign-in finished: swap this device's local identity for the real one. */
+  | { type: 'linkAuth'; previousUserId: string; userId: string; email: string }
+  /** Rows arrived from the server, or went up. Replaces everything but `today`. */
+  | { type: 'replaceAll'; state: State }
 
 function reduce(s: State, a: Action): State {
   switch (a.type) {
@@ -123,7 +148,22 @@ function reduce(s: State, a: Action): State {
     case 'addCategory':
       return { ...s, categories: [...s.categories, a.category] }
     case 'completeOnboarding':
-      return { ...s, members: [a.member] }
+      return {
+        ...s,
+        household: { id: a.householdId, name: a.householdName, inviteCode: a.inviteCode },
+        members: [a.member],
+      }
+    case 'linkAuth':
+      return {
+        ...s,
+        members: s.members.map((m) =>
+          m.userId === a.previousUserId ? { ...m, userId: a.userId, email: a.email } : m,
+        ),
+      }
+    case 'replaceAll':
+      // A pull rewrites everything the server owns. `today` belongs to this
+      // run of the app, not to the database, so it is kept.
+      return { ...a.state, today: s.today }
   }
 }
 
@@ -149,6 +189,7 @@ const seededPeople: Person[] = seed.people.map((p) => ({
 
 export function emptyState(today: IsoDate): State {
   return {
+    household: null,
     accounts: [],
     categories: seededCategories,
     people: seededPeople,
@@ -253,13 +294,48 @@ interface Store {
   renameCategory: (id: string, name: string) => void
   archiveCategory: (id: string, archived: boolean) => void
   addCategory: (name: string, kind: 'expense' | 'income', parentId: string | null) => Category
-  completeOnboarding: (householdName: string, email: string) => void
+  completeOnboarding: (input: OnboardingInput) => void
+  linkAuth: (userId: string, email: string) => void
+  replaceAll: (state: State) => void
+}
+
+export interface OnboardingInput {
+  /** Minted here when creating; taken from the server when joining. */
+  householdId: string
+  householdName: string
+  inviteCode: string
+  email: string
+  /** The Supabase auth user id, or a local one when signing in has not run. */
+  userId: string
+  role: 'owner' | 'member'
 }
 
 const StoreContext = createContext<Store | null>(null)
 
 let counter = 0
 const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${counter++}`
+
+export const newHouseholdId = () => newId('hh')
+
+/**
+ * The code the second phone types in.
+ *
+ * Six characters from an alphabet with no O/0 or I/1, because this gets read
+ * aloud across a room. 32^6 is about a billion, and the server holds a unique
+ * index on it, so a collision is refused rather than silently joining the
+ * wrong household.
+ */
+export function newInviteCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let out = ''
+  for (let i = 0; i < 6; i++) {
+    out += alphabet.charAt(Math.floor(Math.random() * alphabet.length))
+  }
+  return out
+}
+
+/** This phone's identity before it has ever signed in. */
+export const newLocalUserId = () => newId('local')
 
 export function StoreProvider({
   children, initial, persist,
@@ -313,17 +389,30 @@ export function StoreProvider({
     [fire],
   )
 
-  const completeOnboarding = useCallback((householdName: string, email: string) => {
-    const local = email.split('@')[0] ?? 'You'
+  const completeOnboarding = useCallback((input: OnboardingInput) => {
+    const local = input.email.split('@')[0] ?? 'You'
     const member: Member = {
       id: newId('member'),
+      userId: input.userId,
       name: local.charAt(0).toUpperCase() + local.slice(1),
-      email,
-      role: 'owner',
+      email: input.email,
+      role: input.role,
       isCurrentUser: true,
     }
-    fire({ type: 'completeOnboarding', householdName, member })
+    fire({
+      type: 'completeOnboarding',
+      householdId: input.householdId,
+      householdName: input.householdName,
+      inviteCode: input.inviteCode,
+      member,
+    })
   }, [fire])
+
+  const linkAuth = useCallback((userId: string, email: string) => {
+    const me = state.members.find((m) => m.isCurrentUser)
+    if (!me || me.userId === userId) return
+    fire({ type: 'linkAuth', previousUserId: me.userId, userId, email })
+  }, [fire, state.members])
 
   const value = useMemo<Store>(
     () => ({
@@ -333,6 +422,10 @@ export function StoreProvider({
       addAccount,
       addCategory,
       completeOnboarding,
+      linkAuth,
+      // A pull is already on disk by the time it gets here, so it goes straight
+      // to the reducer rather than back through the write-through path.
+      replaceAll: (next) => dispatch({ type: 'replaceAll', state: next }),
       updateTxn: (txn) => fire({ type: 'updateTxn', txn }),
       deleteTxn: (id) => fire({ type: 'deleteTxn', id }),
       updateAccount: (account) => fire({ type: 'updateAccount', account }),
@@ -340,7 +433,7 @@ export function StoreProvider({
       renameCategory: (id, name) => fire({ type: 'renameCategory', id, name }),
       archiveCategory: (id, archived) => fire({ type: 'archiveCategory', id, archived }),
     }),
-    [state, addTxn, addPerson, addAccount, addCategory, completeOnboarding, fire],
+    [state, addTxn, addPerson, addAccount, addCategory, completeOnboarding, linkAuth, fire],
   )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

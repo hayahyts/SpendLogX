@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppState } from '@/store/store'
+import { syncLine, useSync } from '@/sync/SyncProvider'
 import { Body, Card, Micro, ScreenTitle, gutter } from '@/ui/primitives'
 import { BackLink } from './txn/[id]'
 import { useColors } from '@/ui/ThemeProvider'
@@ -17,6 +18,7 @@ export default function Settings() {
   const c = useColors()
   const insets = useSafeAreaInsets()
   const state = useAppState()
+  const { status, signOut } = useSync()
 
   const ledger: [string, string, string][] = [
     ['Accounts', `${state.accounts.filter((a) => !a.archived).length}`, '/manage/accounts'],
@@ -78,7 +80,27 @@ export default function Settings() {
           ))}
         </Card>
 
-        <Card style={{ marginTop: 22 }}>
+        {/* The code is the only way a second phone gets in, so it lives where
+            it can be read aloud rather than behind another screen. */}
+        {state.household?.inviteCode != null && (
+          <Card style={{ marginTop: 22 }}>
+            <Micro size={9}>Invite code</Micro>
+            <Text
+              style={{
+                fontFamily: fonts.archivo800, fontSize: 30, color: c.ink,
+                letterSpacing: 6, marginTop: 8,
+              }}
+            >
+              {state.household.inviteCode}
+            </Text>
+            <Body size={12} style={{ marginTop: 8, lineHeight: 19 }}>
+              Your partner enters this when they set up SpendLogX, and both
+              phones then show the same figures.
+            </Body>
+          </Card>
+        )}
+
+        <Card style={{ marginTop: 14 }}>
           <View style={styles.syncHead}>
             <View style={[styles.dot, { backgroundColor: c.gold }]} />
             <Text style={{ fontFamily: fonts.bodySemi, fontSize: 13, color: c.ink }}>
@@ -90,10 +112,23 @@ export default function Settings() {
             a signal. When there is one, changes go up quietly and your partner's
             come down. Nothing is lost if you are offline for a week.
           </Body>
+          <Body size={12} style={{ marginTop: 10, lineHeight: 19 }}>
+            {status.signedInAs === null
+              ? 'Not signed in, so this phone is on its own. Sign in to share with a second phone.'
+              : `Signed in as ${status.signedInAs}. ${syncLine(status)}.`}
+          </Body>
+          {status.error !== null && (
+            <Body size={11.5} style={{ marginTop: 8, color: c.spent }}>
+              {status.error}
+            </Body>
+          )}
         </Card>
 
         <Pressable
-          onPress={() => router.replace('/onboarding/sign-in')}
+          onPress={() => {
+            void signOut()
+            router.replace('/onboarding/sign-in')
+          }}
           style={[styles.signOut, { borderColor: c.line }]}
         >
           <Text style={{ fontFamily: fonts.body, fontSize: 12.5, color: c.muted }}>Sign out</Text>

@@ -7,7 +7,9 @@
  */
 
 import { sql } from 'drizzle-orm'
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import {
+  index, integer, primaryKey, sqliteTable, text, uniqueIndex,
+} from 'drizzle-orm/sqlite-core'
 
 const now = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`
 
@@ -21,6 +23,12 @@ const syncable = {
 export const household = sqliteTable('household', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  /**
+   * What the second phone types to join. Six characters, generated when the
+   * household is created. Nullable because households created before sync
+   * existed have none until their first push.
+   */
+  inviteCode: text('invite_code'),
   ...syncable,
 })
 
@@ -29,7 +37,14 @@ export const householdMember = sqliteTable(
   {
     id: text('id').primaryKey(),
     householdId: text('household_id').notNull().references(() => household.id),
+    /**
+     * The Supabase auth user id, which is what every RLS policy compares
+     * against. Before the phone has ever signed in it holds a local id, so the
+     * app works with no account at all; signing in rewrites it to the real one.
+     */
     userId: text('user_id').notNull(),
+    /** Shown in the UI. Identity is `user_id`; this is only a label. */
+    email: text('email'),
     displayName: text('display_name').notNull(),
     role: text('role', { enum: ['owner', 'member'] }).notNull(),
     ...syncable,
@@ -145,25 +160,42 @@ export const txn = sqliteTable(
   ],
 )
 
-/** Local mutations awaiting a push. Local only — never synced upward itself. */
+/**
+ * Which rows have local changes Postgres has not seen. Local only — never
+ * synced upward itself.
+ *
+ * An entry carries no payload and no operation, only "this row is dirty". The
+ * pusher reads the row out of SQLite at push time, which means ten edits to one
+ * transaction cost one upsert rather than ten, and the row that goes up is the
+ * one that is true now rather than the one that was true when it was queued.
+ * A delete needs no special case either: deletes are soft, so the tombstone is
+ * just another version of the row.
+ */
 export const outbox = sqliteTable(
   'outbox',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
     tableName: text('table_name').notNull(),
     rowId: text('row_id').notNull(),
-    op: text('op', { enum: ['upsert', 'delete'] }).notNull(),
-    payload: text('payload', { mode: 'json' }).notNull(),
     queuedAt: text('queued_at').notNull().default(now),
-    attempts: integer('attempts').notNull().default(0),
-    lastError: text('last_error'),
   },
-  (t) => [index('outbox_queued').on(t.queuedAt)],
+  (t) => [primaryKey({ columns: [t.tableName, t.rowId] })],
 )
 
 /** Single row holding the pull cursor. */
 export const syncState = sqliteTable('sync_state', {
   id: integer('id').primaryKey(),
+  /**
+   * The newest `updated_at` any pulled row carried, in the server's clock.
+   * Never this phone's clock: the next pull asks for everything after it, and
+   * a fast local clock would skip rows.
+   */
   lastPulledAt: text('last_pulled_at'),
   deviceId: text('device_id').notNull(),
+  /**
+   * Which member is holding this phone, as a `household_member.user_id`. A
+   * fact about the device, not about the household, so it is not synced — and
+   * it is what lets a hydrate decide whose initials go on a row before any
+   * network call has resolved.
+   */
+  userId: text('user_id'),
 })

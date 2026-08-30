@@ -21,7 +21,7 @@ import type {
 } from '@/store/store'
 import { emptyState } from '@/store/store'
 import seed from './seed.json'
-import { DDL_STATEMENTS } from './ddl'
+import { MIGRATIONS } from './ddl'
 
 /** What both drivers can do. */
 export interface LocalDb {
@@ -29,14 +29,21 @@ export interface LocalDb {
   all<T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): T[]
 }
 
-export const HOUSEHOLD_ID = 'hh_local'
-const SCHEMA_VERSION = 1
-
+/**
+ * Bring the database up to the current schema.
+ *
+ * `user_version` counts migrations already applied, so an install that shipped
+ * with only the first one runs the rest and nothing else. Running every
+ * migration every time would fail on the second launch, and skipping them all
+ * once the file exists would strand a phone on an old shape.
+ */
 export function migrate(db: LocalDb): void {
   const [row] = db.all<{ user_version: number }>('PRAGMA user_version')
-  if ((row?.user_version ?? 0) >= SCHEMA_VERSION) return
-  for (const statement of DDL_STATEMENTS) db.run(statement)
-  db.run(`PRAGMA user_version = ${SCHEMA_VERSION}`)
+  const applied = row?.user_version ?? 0
+  for (let i = applied; i < MIGRATIONS.length; i++) {
+    for (const statement of MIGRATIONS[i]?.statements ?? []) db.run(statement)
+    db.run(`PRAGMA user_version = ${i + 1}`)
+  }
 }
 
 // --- hydration ---------------------------------------------------------------
@@ -58,7 +65,7 @@ interface PersonRow {
 }
 
 interface MemberRow {
-  id: string; user_id: string; display_name: string; role: string
+  id: string; user_id: string; email: string | null; display_name: string; role: string
 }
 
 interface TxnRow {
@@ -78,22 +85,26 @@ interface ValuationRow {
  * completed, which is what routes a fresh install to the sign-in screen.
  */
 export function hydrate(db: LocalDb, today: IsoDate): State | null {
-  const [household] = db.all<{ id: string; name: string }>(
-    'SELECT id, name FROM household WHERE deleted_at IS NULL LIMIT 1',
+  const [household] = db.all<{ id: string; name: string; invite_code: string | null }>(
+    'SELECT id, name, invite_code FROM household WHERE deleted_at IS NULL LIMIT 1',
   )
   if (household === undefined) return null
 
+  // Which member is holding the phone is a fact about this device, not about
+  // the household, so it is stored here rather than pulled down with the rows.
+  const [me] = db.all<{ user_id: string }>('SELECT user_id FROM sync_state WHERE id = 1')
+
   const members: Member[] = db
     .all<MemberRow>(
-      'SELECT id, user_id, display_name, role FROM household_member WHERE deleted_at IS NULL ORDER BY created_at',
+      'SELECT id, user_id, email, display_name, role FROM household_member WHERE deleted_at IS NULL ORDER BY created_at',
     )
     .map((r, i) => ({
       id: r.id,
+      userId: r.user_id,
       name: r.display_name,
-      email: r.user_id,
+      email: r.email ?? r.user_id,
       role: r.role === 'owner' ? 'owner' : 'member',
-      // One device, one signed-in person: the first (owner) row is you.
-      isCurrentUser: i === 0,
+      isCurrentUser: me === undefined ? i === 0 : r.user_id === me.user_id,
     }))
 
   const accounts: Account[] = db
@@ -170,13 +181,18 @@ export function hydrate(db: LocalDb, today: IsoDate): State | null {
 
   return {
     ...emptyState(today),
+    household: {
+      id: household.id,
+      name: household.name,
+      inviteCode: household.invite_code,
+    },
     accounts,
     categories,
     people,
     members,
     txns,
     valuations,
-    pendingSync: 0,
+    pendingSync: pendingCount(db),
   }
 }
 
@@ -184,49 +200,90 @@ export function hydrate(db: LocalDb, today: IsoDate): State | null {
 
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
 
-function insertTxn(db: LocalDb, t: Txn): void {
+/**
+ * The tables that sync, in an order that satisfies every foreign key. Push and
+ * pull both walk it — forwards, so a parent always lands before its children.
+ */
+export const SYNCED_TABLES = [
+  'household', 'household_member', 'category', 'person',
+  'account', 'account_valuation', 'txn',
+] as const
+
+export type SyncedTable = (typeof SYNCED_TABLES)[number]
+
+/**
+ * Mark a row as having local changes Postgres has not seen.
+ *
+ * The entry holds no payload: the pusher reads the row when it pushes, so
+ * repeated edits collapse into one upsert and a soft delete needs no special
+ * case — the tombstone is simply the row's latest version.
+ */
+function dirty(db: LocalDb, table: SyncedTable, rowId: string): void {
+  db.run(
+    `INSERT INTO outbox (table_name, row_id, queued_at) VALUES (?, ?, ${NOW})
+     ON CONFLICT (table_name, row_id) DO UPDATE SET queued_at = ${NOW}`,
+    [table, rowId],
+  )
+}
+
+/** How many rows are waiting to go up. Shown as a count, never as a warning. */
+export function pendingCount(db: LocalDb): number {
+  const [row] = db.all<{ n: number }>('SELECT COUNT(*) AS n FROM outbox')
+  return row?.n ?? 0
+}
+
+/** The household this device belongs to, or null before onboarding. */
+export function householdId(db: LocalDb): string | null {
+  const [row] = db.all<{ id: string }>('SELECT id FROM household LIMIT 1')
+  return row?.id ?? null
+}
+
+function requireHousehold(db: LocalDb): string {
+  const id = householdId(db)
+  if (id === null) throw new Error('no household: onboarding has not run')
+  return id
+}
+
+function insertTxn(db: LocalDb, hh: string, t: Txn): void {
   db.run(
     `INSERT INTO txn (id, household_id, type, occurred_on, amount_minor, tips_minor, fee_minor,
        account_id, counter_account_id, category_id, person_id, note, is_opening)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      t.id, HOUSEHOLD_ID, t.type, t.occurredOn, t.amount, t.tips, t.fee,
+      t.id, hh, t.type, t.occurredOn, t.amount, t.tips, t.fee,
       t.accountId, t.counterAccountId, t.categoryId, t.personId, t.note,
       t.isOpening ? 1 : 0,
     ],
   )
+  dirty(db, 'txn', t.id)
 }
 
-function insertSeedCategory(db: LocalDb, c: Category): void {
+function insertCategory(db: LocalDb, hh: string, c: Category, orIgnore = false): void {
   db.run(
-    `INSERT OR IGNORE INTO category (id, household_id, name, kind, parent_id, is_person_facing, archived, sort_order)
+    `INSERT ${orIgnore ? 'OR IGNORE ' : ''}INTO category
+       (id, household_id, name, kind, parent_id, is_person_facing, archived, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [c.id, HOUSEHOLD_ID, c.name, c.kind, c.parentId, c.isPersonFacing ? 1 : 0, c.archived ? 1 : 0, c.sortOrder],
+    [c.id, hh, c.name, c.kind, c.parentId, c.isPersonFacing ? 1 : 0, c.archived ? 1 : 0, c.sortOrder],
   )
+  dirty(db, 'category', c.id)
 }
 
-function insertCategory(db: LocalDb, c: Category): void {
-  db.run(
-    `INSERT INTO category (id, household_id, name, kind, parent_id, is_person_facing, archived, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [c.id, HOUSEHOLD_ID, c.name, c.kind, c.parentId, c.isPersonFacing ? 1 : 0, c.archived ? 1 : 0, c.sortOrder],
-  )
-}
-
-function insertPerson(db: LocalDb, p: Person, memberUserId: string | null): void {
+function insertPerson(db: LocalDb, hh: string, p: Person, memberUserId: string | null): void {
   db.run(
     `INSERT INTO person (id, household_id, name, relation, member_user_id, archived)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [p.id, HOUSEHOLD_ID, p.name, p.relation, memberUserId, p.archived ? 1 : 0],
+    [p.id, hh, p.name, p.relation, memberUserId, p.archived ? 1 : 0],
   )
+  dirty(db, 'person', p.id)
 }
 
-function insertAccount(db: LocalDb, a: Account): void {
+function insertAccount(db: LocalDb, hh: string, a: Account): void {
   db.run(
     `INSERT INTO account (id, household_id, name, kind, opening_balance_minor, opening_balance_on, is_active, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [a.id, HOUSEHOLD_ID, a.name, a.kind, a.openingBalance, a.openingBalanceOn, a.archived ? 0 : 1, a.sortOrder],
+    [a.id, hh, a.name, a.kind, a.openingBalance, a.openingBalanceOn, a.archived ? 0 : 1, a.sortOrder],
   )
+  dirty(db, 'account', a.id)
 }
 
 /** Write one applied store action through to disk. */
@@ -235,15 +292,35 @@ export function persistAction(db: LocalDb, action: Action): void {
     case 'completeOnboarding': {
       // OR IGNORE throughout: signing out and back in walks this path again,
       // and re-onboarding must never corrupt what is already there.
-      db.run('INSERT OR IGNORE INTO household (id, name) VALUES (?, ?)', [HOUSEHOLD_ID, action.householdName])
+      const hh = action.householdId
       db.run(
-        'INSERT OR IGNORE INTO household_member (id, household_id, user_id, display_name, role) VALUES (?, ?, ?, ?, ?)',
-        [action.member.id, HOUSEHOLD_ID, action.member.email, action.member.name, action.member.role],
+        'INSERT OR IGNORE INTO household (id, name, invite_code) VALUES (?, ?, ?)',
+        [hh, action.householdName, action.inviteCode],
       )
+      dirty(db, 'household', hh)
+
+      db.run(
+        `INSERT OR IGNORE INTO household_member (id, household_id, user_id, email, display_name, role)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          action.member.id, hh, action.member.userId, action.member.email,
+          action.member.name, action.member.role,
+        ],
+      )
+      dirty(db, 'household_member', action.member.id)
+
+      // This device's own identity. Not synced: it says who is holding the
+      // phone, which is not a fact about the household.
+      db.run(
+        `INSERT INTO sync_state (id, device_id, user_id) VALUES (1, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET user_id = excluded.user_id`,
+        [action.member.id, action.member.userId],
+      )
+
       // The taxonomy ships with the app; it becomes rows the moment there is a
       // household for it to belong to.
       for (const c of seed.categories) {
-        insertSeedCategory(db, {
+        insertCategory(db, hh, {
           id: c.id,
           name: c.name,
           kind: c.kind === 'income' ? 'income' : 'expense',
@@ -251,19 +328,20 @@ export function persistAction(db: LocalDb, action: Action): void {
           isPersonFacing: c.isPersonFacing,
           archived: false,
           sortOrder: c.sortOrder,
-        })
+        }, true)
       }
       for (const p of seed.people) {
         db.run(
           'INSERT OR IGNORE INTO person (id, household_id, name, relation, member_user_id, archived) VALUES (?, ?, ?, ?, ?, 0)',
-          [p.id, HOUSEHOLD_ID, p.name, null, p.memberUserId],
+          [p.id, hh, p.name, null, p.memberUserId],
         )
+        dirty(db, 'person', p.id)
       }
       return
     }
 
     case 'addTxn':
-      insertTxn(db, action.txn)
+      insertTxn(db, requireHousehold(db), action.txn)
       return
 
     case 'updateTxn':
@@ -278,18 +356,20 @@ export function persistAction(db: LocalDb, action: Action): void {
           action.txn.personId, action.txn.note, action.txn.id,
         ],
       )
+      dirty(db, 'txn', action.txn.id)
       return
 
     case 'deleteTxn':
       db.run(`UPDATE txn SET deleted_at = ${NOW}, updated_at = ${NOW} WHERE id = ?`, [action.id])
+      dirty(db, 'txn', action.id)
       return
 
     case 'addPerson':
-      insertPerson(db, action.person, null)
+      insertPerson(db, requireHousehold(db), action.person, null)
       return
 
     case 'addAccount':
-      insertAccount(db, action.account)
+      insertAccount(db, requireHousehold(db), action.account)
       return
 
     case 'updateAccount':
@@ -303,21 +383,25 @@ export function persistAction(db: LocalDb, action: Action): void {
           action.account.sortOrder, action.account.id,
         ],
       )
+      dirty(db, 'account', action.account.id)
       return
 
-    case 'addValuation':
+    case 'addValuation': {
+      const id = `val_${action.valuation.accountId}_${action.valuation.asOf}`
       db.run(
         'INSERT INTO account_valuation (id, account_id, as_of, value_minor, note) VALUES (?, ?, ?, ?, ?)',
         [
-          `val_${action.valuation.accountId}_${action.valuation.asOf}`,
-          action.valuation.accountId, action.valuation.asOf,
+          id, action.valuation.accountId, action.valuation.asOf,
           action.valuation.value, action.valuation.note ?? null,
         ],
       )
+      dirty(db, 'account_valuation', id)
       return
+    }
 
     case 'renameCategory':
       db.run(`UPDATE category SET name = ?, updated_at = ${NOW} WHERE id = ?`, [action.name, action.id])
+      dirty(db, 'category', action.id)
       return
 
     case 'archiveCategory':
@@ -325,10 +409,34 @@ export function persistAction(db: LocalDb, action: Action): void {
         `UPDATE category SET archived = ?, updated_at = ${NOW} WHERE id = ?`,
         [action.archived ? 1 : 0, action.id],
       )
+      dirty(db, 'category', action.id)
       return
 
     case 'addCategory':
-      insertCategory(db, action.category)
+      insertCategory(db, requireHousehold(db), action.category)
       return
   }
+}
+
+/**
+ * Attach this device to a Supabase account.
+ *
+ * Before the first sign-in a member row carries a local id, so the app works
+ * with no account at all. Signing in rewrites that id to the real one — which
+ * is what every row-level security policy on the server compares against — and
+ * re-queues the row so the change goes up.
+ */
+export function linkMemberToAuth(
+  db: LocalDb, previousUserId: string, userId: string, email: string,
+): void {
+  const [row] = db.all<{ id: string }>(
+    'SELECT id FROM household_member WHERE user_id = ?', [previousUserId],
+  )
+  if (row === undefined) return
+  db.run(
+    `UPDATE household_member SET user_id = ?, email = ?, updated_at = ${NOW} WHERE id = ?`,
+    [userId, email, row.id],
+  )
+  db.run('UPDATE sync_state SET user_id = ? WHERE id = 1', [userId])
+  dirty(db, 'household_member', row.id)
 }

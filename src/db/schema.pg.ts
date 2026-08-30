@@ -17,18 +17,26 @@ const syncable = {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }
 
-export const household = pgTable('household', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  ...syncable,
-})
+export const household = pgTable(
+  'household',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    /** Six characters, typed by the second phone to join. */
+    inviteCode: text('invite_code'),
+    ...syncable,
+  },
+  (t) => [uniqueIndex('household_invite_code').on(t.inviteCode)],
+)
 
 export const householdMember = pgTable(
   'household_member',
   {
     id: text('id').primaryKey(),
     householdId: text('household_id').notNull().references(() => household.id),
+    /** The Supabase auth user id. Every RLS policy compares against this. */
     userId: text('user_id').notNull(),
+    email: text('email'),
     displayName: text('display_name').notNull(),
     role: text('role', { enum: ['owner', 'member'] }).notNull(),
     ...syncable,

@@ -47,8 +47,14 @@ const accounts: Account[] = [
 ]
 
 const members: Member[] = [
-  { id: 'm_k', name: 'Kwesi', email: 'kwesi@example.com', role: 'owner', isCurrentUser: true },
-  { id: 'm_b', name: 'Beb', email: 'beb@example.com', role: 'member', isCurrentUser: false },
+  {
+    id: 'm_k', userId: 'local_demo_k', name: 'Kwesi',
+    email: 'kwesi@example.com', role: 'owner', isCurrentUser: true,
+  },
+  {
+    id: 'm_b', userId: 'local_demo_b', name: 'Beb',
+    email: 'beb@example.com', role: 'member', isCurrentUser: false,
+  },
 ]
 
 const relations: Record<string, string> = {
@@ -136,6 +142,7 @@ export function demoState(): State {
   const base = emptyState(TODAY)
   return {
     ...base,
+    household: { id: 'hh_demo', name: 'Home', inviteCode: 'KWB4T7' },
     accounts,
     members,
     people: base.people.map((p) => ({ ...p, relation: relations[p.name] ?? null })),

@@ -16,6 +16,8 @@ import { balances, totalsForPeriod } from '@/domain/ledger'
 import { isSpendable } from '@/domain/networth'
 import { useAppState } from '@/store/store'
 import { partnerInitial } from '@/store/demo'
+import { type SyncPhase, syncLine, useSync } from '@/sync/SyncProvider'
+import type { Palette } from '@/ui/theme'
 import { Amount } from '@/ui/Amount'
 import { AccountMark, InitialsDisc } from '@/ui/marks'
 import {
@@ -34,6 +36,13 @@ const MONTHS = [
 ]
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+/** Gold while something is outstanding, green once both phones agree. */
+function syncDot(phase: SyncPhase, c: Palette): string {
+  if (phase === 'error') return c.spent
+  if (phase === 'idle') return c.earned
+  return c.gold
+}
+
 function greeting(hour: number): string {
   if (hour < 12) return 'Good morning'
   if (hour < 17) return 'Good afternoon'
@@ -44,6 +53,7 @@ export default function Home() {
   const c = useColors()
   const insets = useSafeAreaInsets()
   const state = useAppState()
+  const { status } = useSync()
 
   const month = periodContaining('month', state.today)
   const totals = useMemo(() => totalsForPeriod(state.txns, month), [state.txns, month])
@@ -95,12 +105,10 @@ export default function Home() {
         <Micro size={9}>Spendable</Micro>
         <Amount value={spendable} size={50} style={{ marginTop: 6 }} />
         <View style={styles.syncRow}>
-          <View style={[styles.dot, { backgroundColor: c.gold }]} />
-          <Body size={12}>
-            {state.pendingSync > 0
-              ? `${state.pendingSync} ${state.pendingSync === 1 ? 'change' : 'changes'} saved on this phone`
-              : 'Everything saved on this phone'}
-          </Body>
+          {/* The dot reports state rather than decorating: gold while there is
+              something outstanding, green once the two phones agree. */}
+          <View style={[styles.dot, { backgroundColor: syncDot(status.phase, c) }]} />
+          <Body size={12}>{syncLine(status)}</Body>
         </View>
       </Pressable>
 

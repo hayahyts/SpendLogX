@@ -13,11 +13,14 @@ import { ZERO, parseCedis as money } from '@/domain/money'
 import { isoDate } from '@/domain/period'
 import type { Txn } from '@/domain/ledger'
 import type { Member, State } from '@/store/store'
-import { DDL } from './ddl'
-import { HOUSEHOLD_ID, type LocalDb, hydrate, migrate, persistAction } from './local'
+import { MIGRATIONS } from './ddl'
+import {
+  type LocalDb, hydrate, householdId, linkMemberToAuth, migrate, persistAction,
+} from './local'
 import seed from './seed.json'
 
 const TODAY = isoDate('2026-08-30')
+const HOUSEHOLD_ID = 'hh_test'
 
 function open(): LocalDb {
   const raw = new Database(':memory:')
@@ -36,13 +39,20 @@ function open(): LocalDb {
 }
 
 const member: Member = {
-  id: 'm_1', name: 'Kwesi', email: 'kwesi@example.com', role: 'owner', isCurrentUser: true,
+  id: 'm_1', userId: 'local_1', name: 'Kwesi',
+  email: 'kwesi@example.com', role: 'owner', isCurrentUser: true,
 }
 
 function onboarded(): LocalDb {
   const db = open()
   migrate(db)
-  persistAction(db, { type: 'completeOnboarding', householdName: 'Home', member })
+  persistAction(db, {
+    type: 'completeOnboarding',
+    householdId: HOUSEHOLD_ID,
+    householdName: 'Home',
+    inviteCode: 'KWB4T7',
+    member,
+  })
   return db
 }
 
@@ -65,12 +75,18 @@ function txn(over: Partial<Txn>): Txn {
 }
 
 describe('the DDL module', () => {
-  it('is byte-identical to the migration on disk', () => {
-    // scripts/gen-ddl.ts copies the migration; this stops the copy drifting.
+  it('is byte-identical to the migrations on disk', () => {
+    // scripts/gen-ddl.ts copies the migrations; this stops the copy drifting.
     const dir = path.join(__dirname, '..', '..', 'drizzle', 'sqlite')
     const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-    const sql = files.map((f) => readFileSync(path.join(dir, f), 'utf8')).join('\n')
-    expect(DDL).toBe(sql)
+    expect(MIGRATIONS.map((m) => m.name)).toEqual(files)
+    for (const migration of MIGRATIONS) {
+      const onDisk = readFileSync(path.join(dir, migration.name), 'utf8')
+        .split('--> statement-breakpoint')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+      expect(migration.statements).toEqual(onDisk)
+    }
   })
 })
 
@@ -81,6 +97,19 @@ describe('migrate', () => {
     migrate(db)
     expect(db.all('SELECT name FROM sqlite_master WHERE type = ?', ['table']).length)
       .toBeGreaterThan(5)
+  })
+
+  it('brings an install forward from an older schema without starting over', () => {
+    // A phone that shipped with only the first migration. It must run what
+    // came after and nothing else — re-running the first would fail outright.
+    const db = open()
+    for (const statement of MIGRATIONS[0]?.statements ?? []) db.run(statement)
+    db.run('PRAGMA user_version = 1')
+
+    expect(() => migrate(db)).not.toThrow()
+    expect(db.all('SELECT invite_code FROM household')).toEqual([])
+    expect(db.all<{ user_version: number }>('PRAGMA user_version')[0]?.user_version)
+      .toBe(MIGRATIONS.length)
   })
 })
 
@@ -95,6 +124,8 @@ describe('a fresh install', () => {
     const db = onboarded()
     const state = hydrate(db, TODAY)
     expect(state).not.toBeNull()
+    expect(state?.household).toEqual({ id: HOUSEHOLD_ID, name: 'Home', inviteCode: 'KWB4T7' })
+    expect(householdId(db)).toBe(HOUSEHOLD_ID)
     expect(state?.members).toEqual([member])
     expect(state?.categories).toHaveLength(seed.categories.length)
     expect(state?.people).toHaveLength(seed.people.length)
@@ -195,6 +226,17 @@ describe('write-through round trips', () => {
     expect(state.valuations).toEqual([
       { accountId: 'a_land', asOf: TODAY, value: money('42000'), note: null },
     ])
+  })
+
+  it('swaps the local identity for the real one when the phone signs in', () => {
+    linkMemberToAuth(db, 'local_1', 'auth_uuid_1', 'kwesi@example.com')
+    const state = hydrate(db, TODAY) as State
+    expect(state.members[0]?.userId).toBe('auth_uuid_1')
+    expect(state.members[0]?.isCurrentUser).toBe(true)
+    // The rewritten row has to go up, or the server would still be keyed to
+    // an identity no policy will ever match.
+    expect(db.all('SELECT row_id FROM outbox WHERE table_name = ?', ['household_member']))
+      .toEqual([{ row_id: 'm_1' }])
   })
 
   it('enforces the ledger shape at the database, not just in code', () => {

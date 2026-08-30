@@ -7,11 +7,15 @@
 
 import { useRef, useState } from 'react'
 import {
-  Pressable, StyleSheet, Text, TextInput, View, type TextInput as TI,
+  ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInput as TI,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useStore } from '@/store/store'
+import {
+  newHouseholdId, newInviteCode, newLocalUserId, useStore,
+} from '@/store/store'
+import { supabase } from '@/sync/client'
+import { joinHousehold } from '@/sync/transport'
 import { Body, Micro, gutter } from '@/ui/primitives'
 import { useColors } from '@/ui/ThemeProvider'
 import { radius } from '@/ui/theme'
@@ -27,9 +31,60 @@ export default function HouseholdSetup() {
   const [mode, setMode] = useState<'create' | 'join'>('create')
   const [name, setName] = useState('')
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const boxes = useRef<(TI | null)[]>([])
 
   const ready = mode === 'create' ? name.trim() !== '' : code.every((x) => x !== '')
+  const address = email ?? 'you@this-phone'
+
+  /**
+   * Creating mints the household here; joining takes it from the server,
+   * name and code included, so the second phone cannot overwrite the first
+   * phone's household with its own placeholder on its first push.
+   */
+  async function proceed() {
+    // Signing out and back in walks this path again; the household already
+    // exists then, so it is not recreated.
+    if (state.members.length > 0) return router.push('/onboarding/accounts')
+
+    setBusy(true)
+    setError(null)
+    try {
+      const userId = supabase === null
+        ? newLocalUserId()
+        : (await supabase.auth.getSession()).data.session?.user.id ?? newLocalUserId()
+
+      if (mode === 'create') {
+        completeOnboarding({
+          householdId: newHouseholdId(),
+          householdName: name.trim(),
+          inviteCode: newInviteCode(),
+          email: address,
+          userId,
+          role: 'owner',
+        })
+      } else {
+        if (supabase === null) throw new Error('Joining a household needs a connection.')
+        const joined = await joinHousehold(
+          supabase, code.join(''), address.split('@')[0] ?? 'Member',
+        )
+        completeOnboarding({
+          householdId: joined.id,
+          householdName: joined.name,
+          inviteCode: joined.inviteCode,
+          email: address,
+          userId,
+          role: 'member',
+        })
+      }
+      router.push('/onboarding/accounts')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: c.ground, paddingTop: insets.top + 20 }]}>
@@ -128,32 +183,34 @@ export default function HouseholdSetup() {
       </View>
 
       <View style={[gutter, { paddingBottom: insets.bottom + 20 }]}>
+        {error !== null && (
+          <Body size={12} style={{ marginBottom: 12, color: c.spent }}>
+            {error}
+          </Body>
+        )}
         <Pressable
-          disabled={!ready}
-          onPress={() => {
-            // Signing out and back in walks this path again; the household
-            // already exists then, so it is not recreated.
-            if (state.members.length === 0) {
-              completeOnboarding(
-                mode === 'create' ? name.trim() : 'Household',
-                email ?? 'you@this-phone',
-              )
-            }
-            router.push('/onboarding/accounts')
-          }}
+          disabled={!ready || busy}
+          onPress={() => void proceed()}
           style={({ pressed }) => [
             styles.button,
-            { backgroundColor: ready ? c.gold : c.sunken, opacity: pressed && ready ? 0.85 : 1 },
+            {
+              backgroundColor: ready && !busy ? c.gold : c.sunken,
+              opacity: pressed && ready ? 0.85 : 1,
+            },
           ]}
         >
-          <Text
-            style={{
-              fontFamily: fonts.archivo700, fontSize: 13.5,
-              color: ready ? c.goldInk : c.zero,
-            }}
-          >
-            Continue to accounts
-          </Text>
+          {busy ? (
+            <ActivityIndicator color={c.goldInk} />
+          ) : (
+            <Text
+              style={{
+                fontFamily: fonts.archivo700, fontSize: 13.5,
+                color: ready ? c.goldInk : c.zero,
+              }}
+            >
+              Continue to accounts
+            </Text>
+          )}
         </Pressable>
       </View>
     </View>
@@ -171,5 +228,8 @@ const styles = StyleSheet.create({
     flex: 1, height: 44, borderRadius: radius.field, borderWidth: 1,
     textAlign: 'center', fontFamily: fonts.archivo700, fontSize: 17,
   },
-  button: { borderRadius: radius.fieldLarge, paddingVertical: 16, alignItems: 'center' },
+  button: {
+    borderRadius: radius.fieldLarge, paddingVertical: 16,
+    alignItems: 'center', justifyContent: 'center', minHeight: 52,
+  },
 })

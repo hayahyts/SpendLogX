@@ -9,6 +9,7 @@ import { StoreProvider, useAppState } from '@/store/store'
 import { emptyState, isoDate } from '@/store/store'
 import { DEMO_ENABLED, initialState } from '@/store/demo'
 import { openPersistence } from '@/db/persist'
+import { SyncProvider } from '@/sync/SyncProvider'
 import { ThemeProvider, useAppFonts, useColors } from '@/ui/ThemeProvider'
 import { ToastHost } from '@/ui/Toast'
 
@@ -20,13 +21,14 @@ export default function RootLayout() {
   // Demo mode stays in memory so review data never lands in the real database.
   // Real mode opens SQLite, hydrates what is stored, and writes every action
   // through — which is what makes closing the app safe.
-  const { initial, persist } = useMemo(() => {
-    if (DEMO_ENABLED) return { initial: initialState(), persist: undefined }
+  const { initial, persist, db } = useMemo(() => {
+    if (DEMO_ENABLED) return { initial: initialState(), persist: undefined, db: null }
     const today = isoDate(new Date().toISOString().slice(0, 10))
     const p = openPersistence(today)
     return {
       initial: p?.stored ?? emptyState(today),
       persist: p?.persist,
+      db: p?.db ?? null,
     }
   }, [])
 
@@ -41,10 +43,12 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <StoreProvider initial={initial} persist={persist}>
-          <ToastHost>
-            <OnboardingGate />
-            <Shell />
-          </ToastHost>
+          <SyncProvider db={db}>
+            <ToastHost>
+              <OnboardingGate />
+              <Shell />
+            </ToastHost>
+          </SyncProvider>
         </StoreProvider>
       </ThemeProvider>
     </SafeAreaProvider>

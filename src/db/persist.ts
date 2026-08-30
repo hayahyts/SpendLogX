@@ -29,6 +29,7 @@ export function openPersistence(today: IsoDate): Persistence | null {
   migrate(db)
 
   return {
+    db,
     stored: hydrate(db, today),
     persist: (action) => {
       try {
