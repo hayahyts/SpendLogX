@@ -65,7 +65,7 @@ tips), income **49,889.47**, transfers **10,611.00**.
 | **Tips survives, behind a "More" disclosure.** | Prominent field — GHS 90 across two months doesn't earn a tap on every entry. |
 | **Balances set manually at first run.** The sheet's numbers are ignored. | Deriving from the two fake salary rows — MoMo has no opening figure there. |
 | **No budgets in v1.** | Monthly limits — you've never had them and didn't ask. Revisit once there's real usage. |
-| **v1 = capture + balances + transaction list.** Dashboard and People follow. | Shipping all four at once — 5–6 weeks before anything reaches your hand. |
+| **Everything ships in one release** — capture, balances, list, dashboard, people, net worth. Design is produced first and approved before build. | A staged release. You'd rather migrate once than twice. Accepted cost: no working app in hand until the whole thing is built. |
 
 ---
 
@@ -224,28 +224,27 @@ plus a report of every transform it applied.
 
 ---
 
-## 7. Phases
+## 7. Sequencing
 
-Genuinely sequential, so numbered.
+**All four surfaces ship together.** No staged release.
 
-**0 — Scaffold.** Expo app, Drizzle schema, migrations both ends, import script,
-`Money` type, CI. No UI.
+Design comes first: the screen inventory in `docs/DESIGN-BRIEF.md` goes to
+Claude Design, the returned designs come back here, and build starts from
+approved screens rather than from guesses.
 
-**1 — Ships first.** Add-transaction flow, accounts with correct balances,
-transfers with fees, transaction list with search / filter / edit. Local SQLite
-only; the sync schema exists but is dormant. *This is the point you close the
-spreadsheet.*
+| Stage | Contents |
+| --- | --- |
+| **Design** | Screen inventory → Claude Design → approved screens back. |
+| **Scaffold** | Expo app, Drizzle schema, migrations both ends, import script, `Money` type, CI. Runs in parallel with design — none of it depends on visuals. |
+| **Build** | Capture, balances, transaction list, dashboard, people, net worth. Sync and household invite included. |
+| **Import & cutover** | Run the import, set opening balances by hand, stop using the sheet. |
 
-**2 — Sync and Beb.** Supabase auth, RLS, the outbox, household invite.
+Two things stay true regardless of the single-release decision:
 
-**3 — Dashboard.** Period picker (week / month / quarter / year), totals,
-category breakdown that adds up — Family included, because it comes from the
-table.
-
-**4 — People and net worth.** Spend per person over any period. Land valuation
-and a net-worth view.
-
----
+- The **scaffold work is design-independent** and starts now, so design time
+  is not idle time.
+- The **capture flow is still the thing that must be right.** If design
+  attention has to be rationed, it goes to the add-transaction screen.
 
 ## 8. Judgement calls I made
 
