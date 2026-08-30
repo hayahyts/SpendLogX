@@ -97,20 +97,12 @@
       "sortOrder": 11
     },
     {
-      "id": "cat_7604985cfff8",
-      "name": "Investment",
-      "kind": "expense",
-      "parentId": null,
-      "isPersonFacing": false,
-      "sortOrder": 12
-    },
-    {
       "id": "cat_ded2edde1bd5",
       "name": "Bills Utilities",
       "kind": "expense",
       "parentId": null,
       "isPersonFacing": false,
-      "sortOrder": 13
+      "sortOrder": 12
     },
     {
       "id": "cat_631373b7ff2f",
@@ -118,7 +110,7 @@
       "kind": "expense",
       "parentId": "cat_ded2edde1bd5",
       "isPersonFacing": false,
-      "sortOrder": 14
+      "sortOrder": 13
     },
     {
       "id": "cat_618f79c706fa",
@@ -126,7 +118,7 @@
       "kind": "expense",
       "parentId": "cat_ded2edde1bd5",
       "isPersonFacing": false,
-      "sortOrder": 15
+      "sortOrder": 14
     },
     {
       "id": "cat_5a9a8ec7a4a8",
@@ -134,7 +126,7 @@
       "kind": "expense",
       "parentId": "cat_ded2edde1bd5",
       "isPersonFacing": false,
-      "sortOrder": 16
+      "sortOrder": 15
     },
     {
       "id": "cat_0ac224103fb3",
@@ -142,7 +134,7 @@
       "kind": "expense",
       "parentId": "cat_ded2edde1bd5",
       "isPersonFacing": false,
-      "sortOrder": 17
+      "sortOrder": 16
     },
     {
       "id": "cat_33a1c5a641e7",
@@ -150,7 +142,7 @@
       "kind": "expense",
       "parentId": "cat_ded2edde1bd5",
       "isPersonFacing": false,
-      "sortOrder": 18
+      "sortOrder": 17
     },
     {
       "id": "cat_e9d113cdc80a",
@@ -158,7 +150,7 @@
       "kind": "expense",
       "parentId": "cat_ded2edde1bd5",
       "isPersonFacing": false,
-      "sortOrder": 19
+      "sortOrder": 18
     },
     {
       "id": "cat_90118f143ae6",
@@ -166,7 +158,7 @@
       "kind": "expense",
       "parentId": null,
       "isPersonFacing": false,
-      "sortOrder": 20
+      "sortOrder": 19
     },
     {
       "id": "cat_4b71d2732720",
@@ -174,7 +166,7 @@
       "kind": "expense",
       "parentId": "cat_90118f143ae6",
       "isPersonFacing": false,
-      "sortOrder": 21
+      "sortOrder": 20
     },
     {
       "id": "cat_1109d8066dca",
@@ -182,7 +174,7 @@
       "kind": "expense",
       "parentId": "cat_90118f143ae6",
       "isPersonFacing": false,
-      "sortOrder": 22
+      "sortOrder": 21
     },
     {
       "id": "cat_7d9e3563b1ec",
@@ -190,7 +182,7 @@
       "kind": "expense",
       "parentId": "cat_90118f143ae6",
       "isPersonFacing": false,
-      "sortOrder": 23
+      "sortOrder": 22
     },
     {
       "id": "cat_28c458fff0c5",
@@ -198,7 +190,7 @@
       "kind": "expense",
       "parentId": "cat_90118f143ae6",
       "isPersonFacing": false,
-      "sortOrder": 24
+      "sortOrder": 23
     },
     {
       "id": "cat_f40c40716d27",
@@ -206,7 +198,7 @@
       "kind": "expense",
       "parentId": null,
       "isPersonFacing": false,
-      "sortOrder": 25
+      "sortOrder": 24
     },
     {
       "id": "cat_25a529aa8b90",
@@ -214,7 +206,7 @@
       "kind": "expense",
       "parentId": "cat_f40c40716d27",
       "isPersonFacing": false,
-      "sortOrder": 26
+      "sortOrder": 25
     },
     {
       "id": "cat_dd5196160d84",
@@ -222,7 +214,7 @@
       "kind": "expense",
       "parentId": "cat_f40c40716d27",
       "isPersonFacing": false,
-      "sortOrder": 27
+      "sortOrder": 26
     },
     {
       "id": "cat_471f67113a00",
@@ -230,7 +222,7 @@
       "kind": "expense",
       "parentId": "cat_f40c40716d27",
       "isPersonFacing": false,
-      "sortOrder": 28
+      "sortOrder": 27
     },
     {
       "id": "cat_b8b8a60ef3a5",
@@ -238,7 +230,7 @@
       "kind": "expense",
       "parentId": "cat_f40c40716d27",
       "isPersonFacing": false,
-      "sortOrder": 29
+      "sortOrder": 28
     },
     {
       "id": "cat_1912aa9b8349",
@@ -246,7 +238,7 @@
       "kind": "expense",
       "parentId": null,
       "isPersonFacing": false,
-      "sortOrder": 30
+      "sortOrder": 29
     },
     {
       "id": "cat_1d5c013206c3",
@@ -254,7 +246,7 @@
       "kind": "expense",
       "parentId": "cat_1912aa9b8349",
       "isPersonFacing": false,
-      "sortOrder": 31
+      "sortOrder": 30
     },
     {
       "id": "cat_f69d0445c944",
@@ -262,7 +254,7 @@
       "kind": "expense",
       "parentId": "cat_1912aa9b8349",
       "isPersonFacing": false,
-      "sortOrder": 32
+      "sortOrder": 31
     },
     {
       "id": "cat_42e27bb0a918",
@@ -270,7 +262,7 @@
       "kind": "expense",
       "parentId": "cat_1912aa9b8349",
       "isPersonFacing": false,
-      "sortOrder": 33
+      "sortOrder": 32
     },
     {
       "id": "cat_25413aaca339",
@@ -278,7 +270,7 @@
       "kind": "expense",
       "parentId": "cat_1912aa9b8349",
       "isPersonFacing": false,
-      "sortOrder": 34
+      "sortOrder": 33
     },
     {
       "id": "cat_f9ada0a2c4df",
@@ -286,7 +278,7 @@
       "kind": "expense",
       "parentId": null,
       "isPersonFacing": false,
-      "sortOrder": 35
+      "sortOrder": 34
     },
     {
       "id": "cat_7d9cec612863",
@@ -294,7 +286,7 @@
       "kind": "expense",
       "parentId": "cat_f9ada0a2c4df",
       "isPersonFacing": false,
-      "sortOrder": 36
+      "sortOrder": 35
     },
     {
       "id": "cat_bc3b73c6cf59",
@@ -302,7 +294,7 @@
       "kind": "expense",
       "parentId": "cat_f9ada0a2c4df",
       "isPersonFacing": false,
-      "sortOrder": 37
+      "sortOrder": 36
     },
     {
       "id": "cat_34ebd444afd9",
@@ -310,7 +302,7 @@
       "kind": "expense",
       "parentId": "cat_f9ada0a2c4df",
       "isPersonFacing": false,
-      "sortOrder": 38
+      "sortOrder": 37
     },
     {
       "id": "cat_3908e135faea",
@@ -318,7 +310,7 @@
       "kind": "expense",
       "parentId": null,
       "isPersonFacing": true,
-      "sortOrder": 39
+      "sortOrder": 38
     },
     {
       "id": "cat_da75505f74c9",
@@ -326,15 +318,7 @@
       "kind": "expense",
       "parentId": null,
       "isPersonFacing": true,
-      "sortOrder": 40
-    },
-    {
-      "id": "cat_e49d540e0ee7",
-      "name": "Loan Repayment",
-      "kind": "expense",
-      "parentId": null,
-      "isPersonFacing": true,
-      "sortOrder": 41
+      "sortOrder": 39
     },
     {
       "id": "cat_394eab968692",
@@ -342,11 +326,27 @@
       "kind": "expense",
       "parentId": null,
       "isPersonFacing": true,
-      "sortOrder": 42
+      "sortOrder": 40
     },
     {
       "id": "cat_8170a4be7e93",
       "name": "Masjid",
+      "kind": "expense",
+      "parentId": "cat_394eab968692",
+      "isPersonFacing": false,
+      "sortOrder": 41
+    },
+    {
+      "id": "cat_755e668a16cb",
+      "name": "Poor",
+      "kind": "expense",
+      "parentId": "cat_394eab968692",
+      "isPersonFacing": false,
+      "sortOrder": 42
+    },
+    {
+      "id": "cat_d74c76678197",
+      "name": "Friends",
       "kind": "expense",
       "parentId": "cat_394eab968692",
       "isPersonFacing": false,
@@ -529,11 +529,6 @@
       "memberUserId": null
     },
     {
-      "id": "person_c11d5e1d35fb",
-      "name": "Friends",
-      "memberUserId": null
-    },
-    {
       "id": "person_493d205c6f0f",
       "name": "Ibrahim",
       "memberUserId": null
@@ -576,11 +571,6 @@
     {
       "id": "person_3a12604432b7",
       "name": "Omama",
-      "memberUserId": null
-    },
-    {
-      "id": "person_4e0fa4378f15",
-      "name": "Poor",
       "memberUserId": null
     },
     {

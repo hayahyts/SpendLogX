@@ -143,8 +143,9 @@ describe('opening balances stop being income', () => {
 })
 
 describe('people become their own dimension', () => {
-  it('attaches a person to the 23 person-directed transactions', () => {
-    expect(analysis.txns.filter((t) => t.personId !== null)).toHaveLength(23)
+  it('attaches a person to the person-directed transactions', () => {
+    // Charity rows naming Friends or Poor are categorised, not attributed.
+    expect(analysis.txns.filter((t) => t.personId !== null)).toHaveLength(20)
   })
 
   it('recovers the two names hidden in zero-width text', () => {
@@ -172,6 +173,19 @@ describe('people become their own dimension', () => {
     expect(spendByPerson(asTxns(), year).get(beb?.id ?? '')).toBe(c('2275'))
   })
 
+  it('keeps the Charity recipients as subcategories, not people', () => {
+    // "Friends" and "Poor" describe who giving was for, not named individuals.
+    const charity = seed.categories.find((cat) => cat.name === 'Charity' && cat.parentId === null)
+    const subs = seed.categories.filter((cat) => cat.parentId === charity?.id).map((cat) => cat.name)
+    expect(subs.sort()).toEqual(['Friends', 'Masjid', 'Poor'])
+    expect(seed.people.map((p) => p.name)).not.toContain('Friends')
+    expect(seed.people.map((p) => p.name)).not.toContain('Poor')
+  })
+
+  it('seeds 16 named individuals', () => {
+    expect(seed.people).toHaveLength(16)
+  })
+
   it('never leaves a person as a category', () => {
     const names = new Set(seed.people.map((p) => p.name))
     expect(seed.categories.filter((cat) => names.has(cat.name))).toEqual([])
@@ -179,11 +193,21 @@ describe('people become their own dimension', () => {
 })
 
 describe('the taxonomy', () => {
-  it('keeps all 13 top-level expense categories, Family included', () => {
+  it('keeps Family, which the dashboard omitted', () => {
     const top = seed.categories.filter((cat) => cat.parentId === null && cat.kind === 'expense')
+    // The dashboard hardcoded 12 of the sheet's 13 and hid 3,541 cedis here.
     expect(top.map((cat) => cat.name)).toContain('Family')
-    // The sheet's dashboard hardcoded 12 and hid 3,541 cedis of Family spending.
-    expect(top).toHaveLength(13)
+  })
+
+  it('seeds no category that describes a transfer', () => {
+    // Offering these as expense categories invites logging the next land
+    // purchase or loan repayment as spending — the original mistake.
+    const names = seed.categories.map((cat) => cat.name)
+    expect(names).not.toContain('Investment')
+    expect(names).not.toContain('Loan Repayment')
+
+    const top = seed.categories.filter((cat) => cat.parentId === null && cat.kind === 'expense')
+    expect(top).toHaveLength(11)
   })
 
   it('discards the drifted dropdown lists in Settings M:N', () => {
@@ -202,7 +226,7 @@ describe('the taxonomy', () => {
 
   it('marks the categories that should offer a person', () => {
     const facing = seed.categories.filter((cat) => cat.isPersonFacing).map((cat) => cat.name).sort()
-    expect(facing).toEqual(['Charity', 'Extended Family', 'Family', 'Loan Repayment'])
+    expect(facing).toEqual(['Charity', 'Extended Family', 'Family'])
   })
 })
 

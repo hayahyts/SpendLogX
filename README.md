@@ -51,8 +51,10 @@ No accounts, no balances, no transactions. At setup you add each account and
 type its balance — positive for a wallet, negative for a debt. Nothing is
 inferred and nothing is pre-filled.
 
-The one thing carried over is the **taxonomy**: 13 expense categories, their
-subcategories, and 18 people. That was a year of thinking and it is worth
+The one thing carried over is the **taxonomy**: 11 expense categories, their
+subcategories, and 16 people. `Investment` and `Loan Repayment` are deliberately
+left out — both describe transfers, and offering them as expense categories is
+how the old sheet came to call a land purchase "spending". That was a year of thinking and it is worth
 keeping; the sheet's *numbers* were not.
 
 ## What the audit found

@@ -70,12 +70,14 @@ double-counts. An unvalued asset falls back to its cost basis and flags itself
 `spendable + assets − liabilities`.
 
 **Buying an asset and repaying a debt are transfers, not spending.** Neither is
-consumption. Together they were ₵39,099 of the sheet's ₵48,943, which is why
+consumption, so neither gets a category: `Investment` and `Loan Repayment` are
+deliberately absent from the seed. Offering them invites logging the next land
+purchase as an expense, which is how the sheet came to claim ₵48,943. Together they were ₵39,099 of the sheet's ₵48,943, which is why
 its real consumption was ₵9,844.
 
 **The app starts empty.** No accounts, no balances, no transactions. The only
-thing seeded is the taxonomy — 13 expense categories, their subcategories, and
-18 people — because that is a year of the user's own thinking and rebuilding it
+thing seeded is the taxonomy — 11 expense categories, their subcategories, and
+16 people — because that is a year of the user's own thinking and rebuilding it
 by hand would be an hour wasted. `scripts/import-workbook.ts` is now an *audit*
 tool, not a seeding one: it proves the figures above are real and emits only
 `categories` and `people`. `seed.json` contains no dates and no money.
@@ -122,10 +124,4 @@ Quoted often, and each is checked by a test:
 
 ## Open
 
-**Two seeded categories are traps.** `Loan Repayment` and `Investment` both
-describe transfers, not spending — repaying a debt and buying land. Seeding
-them invites logging the next one as an expense, which is the exact mistake the
-model exists to prevent. Archive them, or keep them? Undecided.
-
-**`Friends` and `Poor` are seeded as people.** They are Charity subcategories in
-the sheet, not named individuals. Probably an importer misclassification.
+Nothing outstanding. Screens are next, once designs land.

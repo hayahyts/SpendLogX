@@ -24,18 +24,33 @@ import ExcelJS from 'exceljs'
 import { type Money, ZERO, format, fromSheetNumber, pesewas } from '../src/domain/money'
 import { type IsoDate, isoDate } from '../src/domain/period'
 
-/** Subcategories that name a person rather than a kind of spending. */
+/**
+ * Subcategories that name an individual rather than a kind of spending.
+ *
+ * Charity's other subcategories — Masjid, Friends, Poor — describe who the
+ * giving was for, not a named person, so they stay in the category tree.
+ */
 const PEOPLE = new Set([
   'Beb', 'Ibrahim', 'Abdur-Rahman', 'Dedei', 'Odarkor', 'Koshie', 'Mommy',
   'Aryee', 'Sammy', 'Omama', 'Mother', 'Auntie (Maxwell)', 'Nateki', 'Jalil',
-  'Friends', 'Poor',
 ])
 
 /** Beb is the second household member, so support totals must exclude them. */
 const MEMBER_PEOPLE = new Set(['Beb'])
 
 /** Categories whose transactions should offer a person on the entry screen. */
-const PERSON_FACING = new Set(['Family', 'Extended Family', 'Charity', 'Loan Repayment'])
+const PERSON_FACING = new Set(['Family', 'Extended Family', 'Charity'])
+
+/**
+ * Categories that describe a transfer rather than consumption, and so are not
+ * seeded at all.
+ *
+ * Buying land moves money into an asset account; repaying a debt moves it into
+ * a liability. Offering either as an expense category is an invitation to log
+ * the next one as spending, which is exactly how the spreadsheet came to claim
+ * 48,943 when it had consumed 9,844.
+ */
+const TRANSFER_CATEGORIES = new Set(['Investment', 'Loan Repayment'])
 
 /** Investment/Land is a purchase of an asset, not spending. */
 const ASSET_SUBCATEGORY = 'Land'
@@ -208,6 +223,7 @@ export async function importWorkbook(
       const sub = readText(row.getCell(subCol))
       if (!parentName) return
 
+      if (TRANSFER_CATEGORIES.has(parentName)) return
       const parentId = addCategory(parentName, kind, null)
 
       if (!sub.value) return

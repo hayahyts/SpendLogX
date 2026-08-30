@@ -178,17 +178,18 @@ All of this is from the actual data:
 ones they'll most likely add: Cash · MoMo Wallet · Stanbic Bank · Land (asset,
 cost ₵27,500) · Loan from Beb (liability, a negative balance)
 
-**Expense categories** — Food Drink · Transport · Bills Utilities · Shopping ·
-Health · Entertainment · Personal · Family · Extended Family · Charity ·
-Loan Repayment · Other
+**Expense categories** (all 11 the app ships with) — Food Drink · Transport ·
+Bills Utilities · Shopping · Health · Entertainment · Personal · Family ·
+Extended Family · Charity · Other
 
 **Income categories** — Salary · Side Income · Gifts · Refunds · Other Income
 
 **Subcategories (examples)** — Groceries, Takeaway, Fuel, Taxi Trotro, Uber Bolt,
 Car Wash, Rent, Electricity, Clothing, Pharmacy, Streaming, Education, Masjid
 
-**People** — Dedei · Koshie · Odarkor · Beb · Ibrahim · Abdur-Rahman · Jalil ·
-Auntie (Maxwell) · Nateki · Mommy · Fauzia · Nana Adjoa
+**People** (16 ship with the app) — Dedei · Koshie · Odarkor · Beb · Ibrahim ·
+Abdur-Rahman · Jalil · Auntie (Maxwell) · Nateki · Mommy · Mother · Aryee ·
+Sammy · Omama · Fauzia · Nana Adjoa
 
 **Real transactions to populate mockups** — the app ships with none of these;
 they are what the user will log, and what makes a realistic populated screen.
@@ -199,9 +200,9 @@ they are what the user will log, and what makes a realistic populated screen.
 | 300.00 | Buying corn husk | Extended Family (Dedei) | Cash |
 | 200.00 + 10.00 tip | Fuel for Generator | Transport › Fuel | Cash |
 | 1,000.00 | Dr Safo last payment | Extended Family (Dedei) | MoMo Wallet |
-| 1,000.00 | Mary's mother's funeral | Charity (Friends) | MoMo Wallet |
+| 1,000.00 | Mary's mother's funeral | Charity › Friends | MoMo Wallet |
 | 800.00 + 60.00 tip | Spa Treatment | Family (Beb) | Stanbic Bank |
-| 20,000.00 | Payment to Mr Richard | Land purchase (transfer) | Stanbic Bank |
+| 20,000.00 | Payment to Mr Richard | Transfer → Land (not spending) | Stanbic Bank |
 | 23,000.00 | June salary | Salary › Main job | Stanbic Bank |
 | 55.00 | Beans | Food Drink › Takeaway | Cash |
 | 460.00 | Work at cemetery | Charity › Masjid | MoMo Wallet |

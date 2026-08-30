@@ -63,7 +63,7 @@ tips), income **49,889.47**, transfers **10,611.00**.
 | **People are a first-class dimension**, separate from category. | People-as-subcategories — that is precisely what causes the `Beb` collision. |
 | **Every balance is typed at setup — positive, negative or asset cost.** Accounts start empty and you create each one. | Pre-filling, or deriving balances from history. One rule with no exceptions is easier to trust and easier to design a setup screen around. |
 | **Tips survives, behind a "More" disclosure.** | Prominent field — GHS 90 across two months doesn't earn a tap on every entry. |
-| **The taxonomy is kept** — 13 categories, their subcategories, 18 people. | Starting with nothing, or a generic starter set. The taxonomy is a year of the user's own thinking; the specificity (Extended Family, Masjid, Charity) is what made the sheet good. |
+| **The taxonomy is kept** — 11 categories, their subcategories, 16 people. `Investment` and `Loan Repayment` are dropped: both name transfers, and offering them re-invites the original mistake. | Starting with nothing, or a generic starter set. The taxonomy is a year of the user's own thinking; the specificity (Extended Family, Masjid, Charity) is what made the sheet good. |
 | **No budgets in v1.** | Monthly limits — you've never had them and didn't ask. Revisit once there's real usage. |
 | **Everything ships in one release** — capture, balances, list, dashboard, people, net worth. Design is produced first and approved before build. | A staged release. You'd rather migrate once than twice. Accepted cost: no working app in hand until the whole thing is built. |
 
