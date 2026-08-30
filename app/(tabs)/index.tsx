@@ -79,11 +79,13 @@ export default function Home() {
       <View style={[gutter, styles.greetRow]}>
         <View style={{ gap: 6 }}>
           <Micro size={9}>{dayLabel}</Micro>
-          <Text style={[t.screenTitle, { color: c.ink }]}>{greeting(d.getUTCHours())}</Text>
+          <Text style={[t.screenTitle, { color: c.ink }]}>
+            {greeting(new Date().getHours())}
+          </Text>
         </View>
         <Pressable style={styles.members} onPress={() => router.push('/settings')}>
           {state.members.map((m) => (
-            <InitialsDisc key={m.id} name={m.name} size={26} active={m.isCurrentUser} />
+            <InitialsDisc key={m.id} name={m.name} size={26} letters={1} active={m.isCurrentUser} />
           ))}
         </Pressable>
       </View>

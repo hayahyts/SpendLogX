@@ -11,9 +11,16 @@ import { useColors } from './ThemeProvider'
 import { hit, motion, radius } from './theme'
 import { cedi, fonts } from './type'
 
-const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'] as const
+/** Four rows of three, laid out as rows rather than a wrapping grid: a
+ *  percentage width plus a gap overflows and silently drops to two columns. */
+const ROWS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['.', '0', '⌫'],
+] as const
 
-export type Key = (typeof KEYS)[number]
+export type Key = (typeof ROWS)[number][number]
 
 export function Keypad({
   onKey, onSave, canSave,
@@ -23,23 +30,27 @@ export function Keypad({
   return (
     <View style={styles.wrap}>
       <View style={styles.keys}>
-        {KEYS.map((k) => (
-          <Pressable
-            key={k}
-            onPress={() => onKey(k)}
-            accessibilityLabel={k === '⌫' ? 'Delete' : k}
-            style={({ pressed }) => [
-              styles.key,
-              { backgroundColor: pressed ? c.sunken : c.card },
-            ]}
-          >
-            <Text
-              style={{ fontFamily: fonts.archivo700, fontSize: 24, color: c.ink }}
-              allowFontScaling={false}
-            >
-              {k}
-            </Text>
-          </Pressable>
+        {ROWS.map((row, i) => (
+          <View key={i} style={styles.keyRow}>
+            {row.map((k) => (
+              <Pressable
+                key={k}
+                onPress={() => onKey(k)}
+                accessibilityLabel={k === '⌫' ? 'Delete' : k}
+                style={({ pressed }) => [
+                  styles.key,
+                  { backgroundColor: pressed ? c.sunken : c.card },
+                ]}
+              >
+                <Text
+                  style={{ fontFamily: fonts.archivo700, fontSize: 24, color: c.ink }}
+                  allowFontScaling={false}
+                >
+                  {k}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         ))}
       </View>
 
@@ -74,11 +85,10 @@ const GAP = 7
 
 const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', gap: GAP, paddingHorizontal: 14, paddingBottom: 14 },
-  keys: {
-    flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: GAP,
-  },
+  keys: { flex: 1, gap: GAP },
+  keyRow: { flexDirection: 'row', gap: GAP },
   key: {
-    width: `${(100 - 2) / 3}%`,
+    flex: 1,
     height: hit.key,
     borderRadius: radius.key,
     alignItems: 'center',

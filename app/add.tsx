@@ -8,7 +8,7 @@
  * space when absent; the layout above it never moves.
  */
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native'
@@ -273,7 +273,9 @@ function AddSheet() {
               }) }] },
             ]}
           >
-            <Micro size={8.5} tracking={0.16} color={c.gold}>Who is it for</Micro>
+            <Micro size={8.5} tracking={0.16} color={c.gold} style={{ paddingHorizontal: 20 }}>
+              Who is it for
+            </Micro>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -402,29 +404,36 @@ function fmt(m: Money): string {
   return `₵${whole}.${String(abs % 100).padStart(2, '0')}`
 }
 
-/** 1.1s step blink, matching the design's caret. */
+/**
+ * A 1.1s step blink — on for half, off for half, with no fade between, which is
+ * what makes it read as a text caret rather than a pulsing dot.
+ */
 function useCaret() {
   const v = useRef(new Animated.Value(1)).current
-  useRef(
-    Animated.loop(
+  useEffect(() => {
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(v, { toValue: 1, duration: motion.caretBlink / 2, useNativeDriver: true }),
-        Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true, delay: 0 }),
-        Animated.timing(v, { toValue: 0, duration: motion.caretBlink / 2, useNativeDriver: true }),
+        Animated.delay(motion.caretBlink / 2),
+        Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
+        Animated.delay(motion.caretBlink / 2),
         Animated.timing(v, { toValue: 1, duration: 0, useNativeDriver: true }),
       ]),
-    ),
-  ).current.start()
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [v])
   return v
 }
 
 function useSlideIn(active: boolean) {
   const v = useRef(new Animated.Value(active ? 1 : 0)).current
-  Animated.timing(v, {
-    toValue: active ? 1 : 0,
-    duration: motion.personStrip,
-    useNativeDriver: true,
-  }).start()
+  useEffect(() => {
+    Animated.timing(v, {
+      toValue: active ? 1 : 0,
+      duration: motion.personStrip,
+      useNativeDriver: true,
+    }).start()
+  }, [active, v])
   return v
 }
 

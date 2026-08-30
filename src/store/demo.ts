@@ -30,11 +30,19 @@ const account = (
   hasFees, archived: false, sortOrder,
 })
 
-/** Balances as shown in the mocks, entered by hand as the app requires. */
+/**
+ * Opening balances as of 1 June, chosen so that replaying the ten June rows
+ * lands exactly on the balances the mockups show — Cash ₵1,240.50, MoMo
+ * ₵4,182.50, Stanbic ₵18,455.00, and a spendable total of ₵23,878.00.
+ *
+ * Deriving them this way rather than typing the end figures is the point: the
+ * screens then prove the ledger arrives at the designed numbers, instead of
+ * displaying them.
+ */
 const accounts: Account[] = [
-  account('Cash', 'cash', '1240.50', 0),
-  account('MoMo Wallet', 'mobile_money', '4182.50', 1, true),
-  account('Stanbic Bank', 'bank', '18455.00', 2),
+  account('Cash', 'cash', '2868.50', 0),
+  account('MoMo Wallet', 'mobile_money', '5642.50', 1, true),
+  account('Stanbic Bank', 'bank', '16315.00', 2),
   account('Land', 'asset', '0', 3),
 ]
 
@@ -101,7 +109,7 @@ const rows: Row[] = [
   { on: '2026-06-28', type: 'expense', amount: '300.00', cat: ['Extended Family'], person: 'Dedei', account: A.cash, note: 'Buying corn husk' },
   { on: '2026-06-28', type: 'expense', amount: '200.00', tips: '10.00', cat: ['Fuel', 'Transport'], account: A.cash, note: 'Fuel for Generator' },
   { on: '2026-06-27', type: 'expense', amount: '1000.00', cat: ['Extended Family'], person: 'Dedei', account: A.momo, note: 'Dr Safo last payment' },
-  { on: '2026-06-27', type: 'expense', amount: '860.00', tips: '60.00', cat: ['Family'], person: 'Beb', account: A.stanbic, note: 'Spa Treatment', by: 'm_b' },
+  { on: '2026-06-27', type: 'expense', amount: '800.00', tips: '60.00', cat: ['Family'], person: 'Beb', account: A.stanbic, note: 'Spa Treatment', by: 'm_b' },
   { on: '2026-06-26', type: 'expense', amount: '460.00', cat: ['Masjid', 'Charity'], account: A.momo, note: 'Work at cemetery' },
   { on: '2026-06-26', type: 'expense', amount: '75.00', cat: ['Extended Family'], person: 'Koshie', account: A.cash, note: 'Feeding fee' },
   { on: '2026-06-25', type: 'expense', amount: '990.00', cat: ['Extended Family'], person: 'Odarkor', account: A.cash, note: 'Dr Safo part payment' },

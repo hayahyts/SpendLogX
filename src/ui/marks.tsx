@@ -70,22 +70,30 @@ export function AccountMark({
   )
 }
 
-/** Two letters, never a photo. */
-export function initialsOf(name: string): string {
+/**
+ * Initials, never a photo.
+ *
+ * People get two letters — "DE" reads as Dedei at a glance in a list of
+ * sixteen. Household members get one, because there are only two of them and a
+ * single letter is quieter beside a greeting.
+ */
+export function initialsOf(name: string, letters: 1 | 2 = 2): string {
   const cleaned = name.replace(/\(.*?\)/g, '').trim()
   const words = cleaned.split(/[\s-]+/).filter(Boolean)
   if (words.length === 0) return '?'
+  if (letters === 1) return (words[0] ?? '?').slice(0, 1).toUpperCase()
   if (words.length === 1) return (words[0] ?? '').slice(0, 2).toUpperCase()
   return ((words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')).toUpperCase()
 }
 
 export function InitialsDisc({
-  name, size = 34, active = false, style,
+  name, size = 34, active = false, letters = 2, style,
 }: {
   name: string
   size?: number
   /** Ink disc with gold initials when something happened this period. */
   active?: boolean
+  letters?: 1 | 2
   style?: object
 }) {
   const c = useColors()
@@ -103,12 +111,12 @@ export function InitialsDisc({
       <Text
         style={{
           fontFamily: fonts.archivo700,
-          fontSize: Math.max(8, Math.round(size * 0.32)),
+          fontSize: Math.max(8, Math.round(size * (letters === 1 ? 0.4 : 0.32))),
           letterSpacing: 0.02 * size,
           color: active ? c.gold : c.muted,
         }}
       >
-        {initialsOf(name)}
+        {initialsOf(name, letters)}
       </Text>
     </View>
   )

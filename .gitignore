@@ -7,3 +7,6 @@ web-build/
 expo-env.d.ts
 /build
 .env*.local
+
+# Web export used for visual verification
+/web-export
