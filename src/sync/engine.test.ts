@@ -295,6 +295,38 @@ describe('two phones', () => {
     expect((hydrate(b, TODAY) as State).txns.map((t) => t.note)).toContain('From the past')
   })
 
+  it('files the joining phone as one member, not two', async () => {
+    const server = fakeServer()
+    const transport = server.transport()
+
+    const a = open()
+    onboard(a, owner)
+    await sync(a, transport)
+
+    // What join_household does on the server, before B's phone stores
+    // anything: it creates B's member row and names it.
+    const serverMemberId = 'member_uidb'
+    await transport.upsert('household_member', [{
+      id: serverMemberId, household_id: 'hh_1', user_id: 'u_b',
+      email: 'beb@example.com', display_name: 'Beb', role: 'member',
+      created_at: '2026-08-30T00:00:00.000Z', updated_at: '2026-08-30T00:00:00.000Z',
+      deleted_at: null,
+    }])
+
+    // B stores its own row under the id the server handed back, rather than
+    // minting one. A local id here would collide on (household_id, user_id)
+    // the moment the pull brought the server's copy down.
+    const b = open()
+    onboard(b, { ...partner, id: serverMemberId })
+    await sync(b, transport)
+
+    const stateB = hydrate(b, TODAY) as State
+    expect(stateB.members).toHaveLength(2)
+    expect(stateB.members.filter((m) => m.userId === 'u_b')).toHaveLength(1)
+    expect(stateB.members.find((m) => m.userId === 'u_b')?.isCurrentUser).toBe(true)
+    expect(stateB.members.find((m) => m.userId === 'u_a')?.isCurrentUser).toBe(false)
+  })
+
   it('re-syncing changes nothing once both phones are level', async () => {
     const server = fakeServer()
     const transport = server.transport()

@@ -124,9 +124,14 @@ empty, which is what ships.
 npm test          # vitest
 npm run typecheck
 npm run import    # re-audit the workbook, regenerate the taxonomy seed
+npm run db:generate   # both dialects, then regenerate ddl.ts and setup.sql
 npm start         # Expo
 npx expo export --platform web   # then serve it to see the screens in a browser
 ```
+
+To check the row-level security against a real Postgres rather than trusting
+it, run `scripts/supabase-stub.sql` (the two roles and the two `auth` helpers
+Supabase supplies), then `supabase/setup.sql`, then `scripts/verify-rls.sql`.
 
 The seed is committed, and CI fails if re-running the import changes it. A
 change to the importer that moves the output is a reviewable event, not a
@@ -160,11 +165,43 @@ Demo mode (`EXPO_PUBLIC_DEMO` unset or `1`) never touches the database.
 `EXPO_PUBLIC_DEMO=0` is the shipping configuration: fresh installs are gated
 into onboarding until a household exists.
 
+## Sync
+
+**Postgres owns `updated_at`.** A trigger stamps it on every write and the
+client's value is discarded. Two phones cannot be ordered by their own clocks,
+and the pull cursor walks `updated_at` forward, so a phone with a slow clock
+could otherwise hide a row behind the other phone's cursor.
+
+**Conflicts are settled without comparing clocks.** The outbox records only
+"this row is dirty" — no payload, no operation. The pusher reads the row when
+it pushes, so ten edits cost one upsert and a soft delete is just the row's
+latest version. On pull, a row that is dirty locally is skipped: this phone is
+about to send a version that will then be newest on the server.
+
+**Membership is the only key.** `is_member()` is `security definer` so the
+policy on `household_member` need not query the table it guards. You may insert
+exactly one member row, your own — knowing a household id is not enough.
+Joining goes through `join_household()`, which looks up the invite code with
+privilege the joiner does not yet have. No table grants delete: a sync needs
+the tombstone.
+
+**`household_member.user_id` is the Supabase auth id**, because that is what
+every policy compares against; `email` is a separate column and only a label. A
+phone that has never signed in carries a local id there, so the app is complete
+with no account. Signing in rewrites it and re-queues the row.
+
+`supabase/setup.sql` is generated from the drizzle migrations plus
+`supabase/policies.sql` and pasted into the Supabase SQL editor.
+`src/db/supabase-sql.test.ts` fails if the committed copy is stale, so the app
+can never be built against a schema nobody ran. `scripts/verify-rls.sql` proves
+the policies hold against a real Postgres; `src/sync/engine.test.ts` runs two
+SQLite databases against a fake server.
+
 ## Open
 
-**Supabase sync is not wired.** Sign-in is local identity, join-by-invite
-stores nothing remotely, and the sync line reports only what is true: saved on
-this phone. The outbox schema exists for when the backend arrives.
+**Nothing is verified against the live project yet.** `setup.sql` has been run
+against a local Postgres 16, not against Supabase — that needs the SQL editor,
+which only the account holder can reach.
 
 **Two figures in the design mockups do not reconcile,** and were not copied. The
 Home total of ₵3,938 counts the spa tip but not the fuel tip, while the same

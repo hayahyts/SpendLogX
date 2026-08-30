@@ -308,6 +308,12 @@ export interface OnboardingInput {
   /** The Supabase auth user id, or a local one when signing in has not run. */
   userId: string
   role: 'owner' | 'member'
+  /**
+   * The member row's id. Supplied by the server when joining, so that the
+   * copy stored here and the copy the pull brings down are one row rather
+   * than two of the same person.
+   */
+  memberId?: string
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -392,7 +398,7 @@ export function StoreProvider({
   const completeOnboarding = useCallback((input: OnboardingInput) => {
     const local = input.email.split('@')[0] ?? 'You'
     const member: Member = {
-      id: newId('member'),
+      id: input.memberId ?? newId('member'),
       userId: input.userId,
       name: local.charAt(0).toUpperCase() + local.slice(1),
       email: input.email,

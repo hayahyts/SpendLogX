@@ -349,7 +349,7 @@ create or replace function public.join_household(
   p_invite_code text,
   p_display_name text
 )
-returns table (id text, name text, invite_code text)
+returns table (id text, name text, invite_code text, member_id text)
 language plpgsql
 security definer
 set search_path = public
@@ -357,6 +357,7 @@ as $$
 declare
   v_household public.household%rowtype;
   v_uid text := auth.uid()::text;
+  v_member_id text;
 begin
   if v_uid is null then
     raise exception 'not signed in';
@@ -381,10 +382,15 @@ begin
   )
   on conflict (household_id, user_id) do update
     set display_name = excluded.display_name,
-        deleted_at = null;
+        deleted_at = null
+  returning household_member.id into v_member_id;
 
+  -- The member id goes back with the household because the joining phone has
+  -- to store its own member row under the same id. If it minted its own, the
+  -- pull would bring this row down beside it and the two would collide on
+  -- (household_id, user_id) — the same person, filed twice.
   return query
-    select v_household.id, v_household.name, v_household.invite_code;
+    select v_household.id, v_household.name, v_household.invite_code, v_member_id;
 end;
 $$;
 

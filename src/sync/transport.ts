@@ -44,7 +44,7 @@ export function supabaseTransport(client: SupabaseClient): Transport {
  */
 export async function joinHousehold(
   client: SupabaseClient, code: string, displayName: string,
-): Promise<{ id: string; name: string; inviteCode: string }> {
+): Promise<{ id: string; name: string; inviteCode: string; memberId: string }> {
   const { data, error } = await client.rpc('join_household', {
     p_invite_code: code.trim().toUpperCase(),
     p_display_name: displayName,
@@ -57,6 +57,9 @@ export async function joinHousehold(
     id: String(row.id),
     name: String(row.name),
     inviteCode: String(row.invite_code),
+    // Stored under the server's id, not one minted here: otherwise the pull
+    // brings the same member down beside the local copy and the two collide.
+    memberId: String(row.member_id),
   }
 }
 

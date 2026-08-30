@@ -73,6 +73,7 @@ export default function HouseholdSetup() {
           householdId: joined.id,
           householdName: joined.name,
           inviteCode: joined.inviteCode,
+          memberId: joined.memberId,
           email: address,
           userId,
           role: 'member',

@@ -106,6 +106,14 @@ end $$;
 select assert((select count(*) from join_household('kwb4t7', 'Beb')) = 1,
   'the invite code is accepted regardless of case');
 
+-- The joining phone stores its own member row under this id. If it minted one
+-- instead, the pull would bring the server's copy down beside it and the two
+-- would collide on (household_id, user_id) — the same person, filed twice.
+select assert(
+  (select member_id from join_household('KWB4T7', 'Beb'))
+    = (select id from household_member where user_id = :'B'),
+  'joining hands back the member row id it created');
+
 select assert((select count(*) from household) = 1, 'B can now see the household');
 select assert((select count(*) from txn) = 1, 'B can now see the transactions');
 select assert((select count(*) from household_member) = 2, 'B sees both members');
