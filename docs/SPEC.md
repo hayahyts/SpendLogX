@@ -2,9 +2,11 @@
 
 Converting `Spending_Tracker_GHS.xlsx` into an Expo app.
 
-Status: **agreed, not yet built.** Every decision below came out of a grilling
+Status: **built and usable.** Every decision below came out of a grilling
 session and is recorded with the reasoning, so we can tell later whether a
-change is a correction or a drift.
+change is a correction or a drift. The app ships the full screen inventory,
+persists to SQLite on device, and starts empty behind onboarding; Supabase
+sync is the one piece still to come.
 
 Currency is GHS throughout. All money is stored as **integer pesewas**.
 
