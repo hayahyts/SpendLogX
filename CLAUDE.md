@@ -89,11 +89,34 @@ tool, not a seeding one: it proves the figures above are real and emits only
 | `src/domain/` | Money, dates, ledger, net worth. Pure TypeScript — no Expo, no database. Where correctness lives. |
 | `src/db/` | Drizzle schemas per dialect, plus the imported `seed.json`. |
 | `scripts/import-workbook.ts` | Audits the spreadsheet. Emits only the taxonomy as `seed.json`; the accounts and 40 transactions it parses stay in `analysis` and never ship. |
-| `app/` | expo-router screens. A placeholder until designs land. |
+| `src/ui/` | Design tokens, typography and the shared components. Transcribed from the handoff; the values there are final. |
+| `src/store/` | App state and selectors. The seam SQLite slots into. |
+| `app/` | expo-router screens, 17 of them. |
+| `assets/fonts/` | Archivo cut to the widths the design specifies. |
 
 The two schemas are written out separately because Drizzle's column builders
 differ per dialect, so they can drift. `src/db/schema.drift.test.ts` asserts
 they haven't. If you add a column, add it on both sides.
+
+## The screens
+
+`docs/DESIGN-BRIEF.md` is the brief that went out; the handoff that came
+back is the source of truth for every colour, size and radius.
+
+**Archivo has a width axis and React Native cannot vary a font axis at
+runtime**, so the widths the design calls for — 105% for section heads, 112%
+for display, 125% for the sign-in mark — are cut from the variable font as
+static instances into `assets/fonts/`. Never approximate one with `scaleX`.
+
+**Neither Archivo nor Public Sans carries ₵ (U+20B5).** The glyph comes from the
+platform font, which is why `Cedi` and `cedi()` set no `fontFamily`. It keeps
+its size and its gold.
+
+**No screen holds a number.** Every figure is computed by `src/domain` from the
+store. `src/store/demo.ts` holds the ten rows the mockups were drawn against so
+the screens can be reviewed; its opening balances are derived so that replaying
+those rows lands exactly on the mockups' figures. `EXPO_PUBLIC_DEMO=0` starts
+empty, which is what ships.
 
 ## Commands
 
@@ -102,6 +125,7 @@ npm test          # vitest
 npm run typecheck
 npm run import    # re-audit the workbook, regenerate the taxonomy seed
 npm start         # Expo
+npx expo export --platform web   # then serve it to see the screens in a browser
 ```
 
 The seed is committed, and CI fails if re-running the import changes it. A
@@ -124,4 +148,12 @@ Quoted often, and each is checked by a test:
 
 ## Open
 
-Nothing outstanding. Screens are next, once designs land.
+**Nothing is persisted yet.** The store is in memory. `src/db/` has the schema
+and migrations for both dialects; wiring the store to expo-sqlite, and then the
+outbox to Supabase, is the next piece.
+
+**Two figures in the design mockups do not reconcile,** and were not copied. The
+Home total of ₵3,938 counts the spa tip but not the fuel tip, while the same
+mockup's dashboard shows Transport at ₵210 — which includes that tip. Ours is
+₵3,948 throughout. And the greeting block reads SATURDAY 28 JUNE, but that date
+is a Sunday; the app derives the weekday.
