@@ -1,11 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { View } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, router, usePathname } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { StoreProvider } from '@/store/store'
-import { initialState } from '@/store/demo'
+import { StoreProvider, useAppState } from '@/store/store'
+import { emptyState, isoDate } from '@/store/store'
+import { DEMO_ENABLED, initialState } from '@/store/demo'
+import { openPersistence } from '@/db/persist'
 import { ThemeProvider, useAppFonts, useColors } from '@/ui/ThemeProvider'
 import { ToastHost } from '@/ui/Toast'
 
@@ -14,6 +17,19 @@ void SplashScreen.preventAutoHideAsync()
 export default function RootLayout() {
   const { loaded, error } = useAppFonts()
 
+  // Demo mode stays in memory so review data never lands in the real database.
+  // Real mode opens SQLite, hydrates what is stored, and writes every action
+  // through — which is what makes closing the app safe.
+  const { initial, persist } = useMemo(() => {
+    if (DEMO_ENABLED) return { initial: initialState(), persist: undefined }
+    const today = isoDate(new Date().toISOString().slice(0, 10))
+    const p = openPersistence(today)
+    return {
+      initial: p?.stored ?? emptyState(today),
+      persist: p?.persist,
+    }
+  }, [])
+
   useEffect(() => {
     if (loaded || error) void SplashScreen.hideAsync()
   }, [loaded, error])
@@ -21,16 +37,37 @@ export default function RootLayout() {
   if (!loaded && !error) return null
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       <ThemeProvider>
-        <StoreProvider initial={initialState()}>
+        <StoreProvider initial={initial} persist={persist}>
           <ToastHost>
+            <OnboardingGate />
             <Shell />
           </ToastHost>
         </StoreProvider>
       </ThemeProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   )
+}
+
+/**
+ * A fresh install has no household yet, and everything downstream assumes one:
+ * route it to onboarding until sign-in and household setup have run.
+ */
+function OnboardingGate() {
+  const state = useAppState()
+  const pathname = usePathname()
+  const needsOnboarding = !DEMO_ENABLED && state.members.length === 0
+
+  useEffect(() => {
+    if (needsOnboarding && !pathname.startsWith('/onboarding')) {
+      router.replace('/onboarding/sign-in')
+    }
+  }, [needsOnboarding, pathname])
+
+  return null
 }
 
 function Shell() {

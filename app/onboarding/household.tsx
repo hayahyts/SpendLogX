@@ -9,8 +9,9 @@ import { useRef, useState } from 'react'
 import {
   Pressable, StyleSheet, Text, TextInput, View, type TextInput as TI,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useStore } from '@/store/store'
 import { Body, Micro, gutter } from '@/ui/primitives'
 import { useColors } from '@/ui/ThemeProvider'
 import { radius } from '@/ui/theme'
@@ -21,6 +22,8 @@ const CODE_LENGTH = 6
 export default function HouseholdSetup() {
   const c = useColors()
   const insets = useSafeAreaInsets()
+  const { email } = useLocalSearchParams<{ email?: string }>()
+  const { state, completeOnboarding } = useStore()
   const [mode, setMode] = useState<'create' | 'join'>('create')
   const [name, setName] = useState('')
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''))
@@ -127,7 +130,17 @@ export default function HouseholdSetup() {
       <View style={[gutter, { paddingBottom: insets.bottom + 20 }]}>
         <Pressable
           disabled={!ready}
-          onPress={() => router.push('/onboarding/accounts')}
+          onPress={() => {
+            // Signing out and back in walks this path again; the household
+            // already exists then, so it is not recreated.
+            if (state.members.length === 0) {
+              completeOnboarding(
+                mode === 'create' ? name.trim() : 'Household',
+                email ?? 'you@this-phone',
+              )
+            }
+            router.push('/onboarding/accounts')
+          }}
           style={({ pressed }) => [
             styles.button,
             { backgroundColor: ready ? c.gold : c.sunken, opacity: pressed && ready ? 0.85 : 1 },

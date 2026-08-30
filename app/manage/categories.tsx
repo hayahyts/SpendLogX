@@ -5,7 +5,8 @@
  * struck through rather than vanishing, so it is obvious what happened to it.
  */
 
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native'
+import { useState } from 'react'
+import { ScrollView, StyleSheet, Text, TextInput, View, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { childrenOf, topLevel, useStore } from '@/store/store'
 import { Body, Card, Micro, ScreenTitle, gutter } from '@/ui/primitives'
@@ -32,7 +33,17 @@ function DragHandle({ active = false }: { active?: boolean }) {
 export default function ManageCategories() {
   const c = useColors()
   const insets = useSafeAreaInsets()
-  const { state, archiveCategory } = useStore()
+  const { state, archiveCategory, renameCategory, addCategory } = useStore()
+  const [newName, setNewName] = useState('')
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [renameText, setRenameText] = useState('')
+
+  function commitRename() {
+    if (renaming !== null && renameText.trim() !== '') {
+      renameCategory(renaming, renameText.trim())
+    }
+    setRenaming(null)
+  }
 
   const parents = topLevel(state, 'expense')
 
@@ -59,9 +70,23 @@ export default function ManageCategories() {
               <Card key={parent.id} padded={false} style={{ borderRadius: radius.rowGroupLarge }}>
                 <View style={styles.row}>
                   <DragHandle />
-                  <Text style={{ flex: 1, fontFamily: fonts.bodySemi, fontSize: 13.5, color: c.ink }}>
-                    {parent.name}
-                  </Text>
+                  {renaming === parent.id ? (
+                    <TextInput
+                      value={renameText}
+                      onChangeText={setRenameText}
+                      onSubmitEditing={commitRename}
+                      onBlur={commitRename}
+                      autoFocus
+                      style={{ flex: 1, fontFamily: fonts.bodySemi, fontSize: 13.5, color: c.ink, padding: 0 }}
+                    />
+                  ) : (
+                    <Text
+                      onPress={() => { setRenaming(parent.id); setRenameText(parent.name) }}
+                      style={{ flex: 1, fontFamily: fonts.bodySemi, fontSize: 13.5, color: c.ink }}
+                    >
+                      {parent.name}
+                    </Text>
+                  )}
                   {parent.isPersonFacing && (
                     <View style={[styles.tag, { borderColor: c.goldInk }]}>
                       <Micro size={8} color={c.goldInk} tracking={0.16}>person</Micro>
@@ -78,15 +103,27 @@ export default function ManageCategories() {
                     style={[styles.row, styles.childRow, { borderTopColor: c.rowLine }]}
                   >
                     <DragHandle />
-                    <Text
-                      style={{
-                        flex: 1, fontFamily: fonts.body, fontSize: 12.5,
-                        color: kid.archived ? c.zero : c.muted,
-                        textDecorationLine: kid.archived ? 'line-through' : 'none',
-                      }}
-                    >
-                      {kid.name}
-                    </Text>
+                    {renaming === kid.id ? (
+                      <TextInput
+                        value={renameText}
+                        onChangeText={setRenameText}
+                        onSubmitEditing={commitRename}
+                        onBlur={commitRename}
+                        autoFocus
+                        style={{ flex: 1, fontFamily: fonts.body, fontSize: 12.5, color: c.ink, padding: 0 }}
+                      />
+                    ) : (
+                      <Text
+                        onPress={() => { setRenaming(kid.id); setRenameText(kid.name) }}
+                        style={{
+                          flex: 1, fontFamily: fonts.body, fontSize: 12.5,
+                          color: kid.archived ? c.zero : c.muted,
+                          textDecorationLine: kid.archived ? 'line-through' : 'none',
+                        }}
+                      >
+                        {kid.name}
+                      </Text>
+                    )}
                     <Pressable onPress={() => archiveCategory(kid.id, !kid.archived)} hitSlop={8}>
                       <Body size={11}>{kid.archived ? 'Restore' : 'Archive'}</Body>
                     </Pressable>
@@ -96,11 +133,20 @@ export default function ManageCategories() {
             )
           })}
 
-          <Pressable style={[styles.add, { borderColor: c.line }]}>
-            <Text style={{ fontFamily: fonts.body, fontSize: 12.5, color: c.muted }}>
-              + New top-level category
-            </Text>
-          </Pressable>
+          <View style={[styles.add, { borderColor: c.line }]}>
+            <TextInput
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="+ New top-level category"
+              placeholderTextColor={c.muted}
+              onSubmitEditing={() => {
+                if (newName.trim() !== '') addCategory(newName.trim(), 'expense', null)
+                setNewName('')
+              }}
+              returnKeyType="done"
+              style={{ fontFamily: fonts.body, fontSize: 12.5, color: c.ink, padding: 0, textAlign: 'center' }}
+            />
+          </View>
         </View>
       </View>
     </ScrollView>

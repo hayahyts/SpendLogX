@@ -9,6 +9,7 @@
  */
 
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Swipeable } from 'react-native-gesture-handler'
 import type { Txn } from '@/domain/ledger'
 import { add } from '@/domain/money'
 import { type State, accountById, categoryPath, personById } from '@/store/store'
@@ -50,25 +51,28 @@ export function metaFor(state: State, txn: Txn, enteredBy?: string): string {
 }
 
 export function TxnRow({
-  txn, state, onPress, enteredBy,
+  txn, state, onPress, enteredBy, onEdit, onDelete,
 }: {
   txn: Txn
   state: State
   onPress?: () => void
   /** Single initial, shown only when the partner entered it. */
   enteredBy?: string | undefined
+  /** Swipe actions. When absent the row does not swipe. */
+  onEdit?: (() => void) | undefined
+  onDelete?: (() => void) | undefined
 }) {
   const c = useColors()
   const tone = toneFor(txn)
   const total = txn.type === 'expense' ? add(txn.amount, txn.tips) : txn.amount
   const title = txn.note ?? categoryPath(state, txn.categoryId)
 
-  return (
+  const body = (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        { opacity: pressed ? 0.7 : 1, minHeight: hit.row },
+        { opacity: pressed ? 0.7 : 1, minHeight: hit.row, backgroundColor: c.card },
       ]}
     >
       <View style={styles.left}>
@@ -91,9 +95,39 @@ export function TxnRow({
       />
     </Pressable>
   )
+
+  if (!onEdit && !onDelete) return body
+
+  return (
+    <Swipeable
+      renderRightActions={() => (
+        <View style={styles.actions}>
+          {onEdit && (
+            <Pressable onPress={onEdit} style={[styles.action, { backgroundColor: c.sunken }]}>
+              <Text style={{ fontFamily: undefined, fontSize: 12, fontWeight: '600', color: c.ink }}>
+                Edit
+              </Text>
+            </Pressable>
+          )}
+          {onDelete && (
+            <Pressable onPress={onDelete} style={[styles.action, { backgroundColor: c.spent }]}>
+              <Text style={{ fontFamily: undefined, fontSize: 12, fontWeight: '600', color: c.card }}>
+                Delete
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+      overshootRight={false}
+    >
+      {body}
+    </Swipeable>
+  )
 }
 
 const styles = StyleSheet.create({
+  actions: { flexDirection: 'row' },
+  action: { width: 72, alignItems: 'center', justifyContent: 'center' },
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 13, paddingHorizontal: 16, gap: 12,

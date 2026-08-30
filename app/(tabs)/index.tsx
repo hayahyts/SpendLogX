@@ -98,8 +98,8 @@ export default function Home() {
           <View style={[styles.dot, { backgroundColor: c.gold }]} />
           <Body size={12}>
             {state.pendingSync > 0
-              ? `${state.pendingSync} changes syncing · saved on this phone`
-              : 'All changes saved on this phone'}
+              ? `${state.pendingSync} ${state.pendingSync === 1 ? 'change' : 'changes'} saved on this phone`
+              : 'Everything saved on this phone'}
           </Body>
         </View>
       </Pressable>
@@ -126,7 +126,9 @@ export default function Home() {
                 style={{ marginTop: 12 }}
               />
               {held && (
-                <Meta style={{ marginTop: 4 }}>Asset · not spendable</Meta>
+                <Meta style={{ marginTop: 4 }}>
+                  {a.kind === 'asset' ? 'Asset · not spendable' : 'Owed · not spendable'}
+                </Meta>
               )}
             </Card>
           )

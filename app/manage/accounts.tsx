@@ -6,6 +6,7 @@
  */
 
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native'
+import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ZERO } from '@/domain/money'
 import { balances } from '@/domain/ledger'
@@ -76,7 +77,10 @@ export default function ManageAccounts() {
           ))}
         </Card>
 
-        <Pressable style={[styles.add, { borderColor: c.line }]}>
+        <Pressable
+          onPress={() => router.push('/manage/add-account')}
+          style={[styles.add, { borderColor: c.line }]}
+        >
           <Text style={{ fontFamily: fonts.body, fontSize: 12.5, color: c.muted }}>
             + Another account
           </Text>

@@ -18,7 +18,7 @@ import { ZERO, type Money } from '@/domain/money'
 import { isoDate } from '@/domain/period'
 import type { Txn, TxnType } from '@/domain/ledger'
 import {
-  accountById, isPersonFacing, recentCategories, recentPeople, useStore,
+  accountById, categoryPath, isPersonFacing, recentCategories, recentPeople, useStore,
 } from '@/store/store'
 import { Amount, Cedi } from '@/ui/Amount'
 import { AccountMark, InitialsDisc } from '@/ui/marks'
@@ -29,6 +29,7 @@ import { SheetTheme, useColors } from '@/ui/ThemeProvider'
 import { motion, radius } from '@/ui/theme'
 import { fonts, micro, tabular } from '@/ui/type'
 import { useToast } from '@/ui/Toast'
+import { askForCategory, askForPerson } from '@/ui/pickerBridge'
 
 const SEGMENTS = ['Expense', 'Income', 'Transfer'] as const
 type Segment = (typeof SEGMENTS)[number]
@@ -79,6 +80,9 @@ function AddSheet() {
     () => recentCategories(state, kind === 'income' ? 'income' : 'expense'),
     [state, kind],
   )
+  /** A category chosen from the full picker that is not among the six chips. */
+  const pickedOutsideChips =
+    categoryId !== null && !chips.some((cat) => cat.id === categoryId)
   const people = useMemo(() => recentPeople(state, 2), [state])
   const showPeople = kind !== 'transfer' && isPersonFacing(state, categoryId)
 
@@ -93,7 +97,11 @@ function AddSheet() {
   const dateLabel = `Today · ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`
 
   function cycleAccount(which: 'from' | 'to') {
-    const usable = state.accounts.filter((a) => !a.archived)
+    // An expense is paid from money you can spend; only a transfer may touch
+    // an asset or a liability account.
+    const usable = state.accounts.filter(
+      (a) => !a.archived && (kind === 'transfer' || (a.kind !== 'asset' && a.kind !== 'liability')),
+    )
     if (usable.length === 0) return
     const current = which === 'from' ? accountId : toId
     const i = usable.findIndex((a) => a.id === current)
@@ -247,6 +255,13 @@ function AddSheet() {
           </View>
         ) : (
           <View style={styles.chips}>
+            {pickedOutsideChips && (
+              <Chip
+                label={categoryPath(state, categoryId)}
+                selected
+                onPress={() => { setCategoryId(null); setPersonId(null) }}
+              />
+            )}
             {chips.map((cat) => (
               <Chip
                 key={cat.id}
@@ -259,7 +274,18 @@ function AddSheet() {
                 }}
               />
             ))}
-            <Chip label="All ›" outlined onPress={() => router.push('/picker/category')} />
+            <Chip
+              label="All ›"
+              outlined
+              onPress={() => {
+                askForCategory((picked) => {
+                  setCategoryId(picked)
+                  setPersonId(null)
+                  setError(null)
+                })
+                router.push('/picker/category')
+              }}
+            />
           </View>
         )}
 
@@ -310,7 +336,10 @@ function AddSheet() {
               <Chip
                 label={`All ${state.people.length} ›`}
                 dashed
-                onPress={() => router.push('/picker/person')}
+                onPress={() => {
+                  askForPerson((picked) => setPersonId(picked))
+                  router.push('/picker/person')
+                }}
               />
             </ScrollView>
           </Animated.View>

@@ -6,7 +6,7 @@
  * someone reading a People total.
  */
 
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native'
+import { ScrollView, Share, StyleSheet, Text, View, Pressable } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppState } from '@/store/store'
 import { InitialsDisc } from '@/ui/marks'
@@ -61,7 +61,14 @@ export default function Household() {
               </View>
             ))}
           </View>
-          <Pressable style={[styles.share, { backgroundColor: c.gold }]}>
+          <Pressable
+            onPress={() => {
+              void Share.share({
+                message: `Join our SpendLogX household with the code ${CODE}`,
+              })
+            }}
+            style={[styles.share, { backgroundColor: c.gold }]}
+          >
             <Text style={{ fontFamily: fonts.archivo700, fontSize: 12.5, color: c.goldInk }}>
               Share the code
             </Text>

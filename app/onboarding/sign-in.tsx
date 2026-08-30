@@ -48,7 +48,9 @@ export default function SignIn() {
 
         <Pressable
           disabled={!valid}
-          onPress={() => router.push('/onboarding/household')}
+          onPress={() =>
+            router.push({ pathname: '/onboarding/household', params: { email: email.trim() } })
+          }
           style={({ pressed }) => [
             styles.button,
             {
@@ -63,13 +65,13 @@ export default function SignIn() {
               color: valid ? c.goldInk : c.zero,
             }}
           >
-            Email me a sign-in link
+            Continue with this email
           </Text>
         </Pressable>
 
         <Body size={11.5} style={{ marginTop: 14, maxWidth: 300 }}>
-          No password to lose. The link expires in 15 minutes and only works on
-          this phone.
+          No password to lose. The email is your identity on this phone; nothing
+          is sent anywhere until syncing arrives.
         </Body>
       </View>
 

@@ -92,7 +92,10 @@ export default function Settings() {
           </Body>
         </Card>
 
-        <Pressable style={[styles.signOut, { borderColor: c.line }]}>
+        <Pressable
+          onPress={() => router.replace('/onboarding/sign-in')}
+          style={[styles.signOut, { borderColor: c.line }]}
+        >
           <Text style={{ fontFamily: fonts.body, fontSize: 12.5, color: c.muted }}>Sign out</Text>
         </Pressable>
       </View>

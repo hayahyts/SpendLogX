@@ -68,7 +68,7 @@ export interface State {
   today: IsoDate
 }
 
-type Action =
+export type Action =
   | { type: 'addTxn'; txn: Txn }
   | { type: 'updateTxn'; txn: Txn }
   | { type: 'deleteTxn'; id: string }
@@ -78,6 +78,8 @@ type Action =
   | { type: 'addValuation'; valuation: Valuation }
   | { type: 'renameCategory'; id: string; name: string }
   | { type: 'archiveCategory'; id: string; archived: boolean }
+  | { type: 'addCategory'; category: Category }
+  | { type: 'completeOnboarding'; householdName: string; member: Member }
 
 function reduce(s: State, a: Action): State {
   switch (a.type) {
@@ -118,6 +120,10 @@ function reduce(s: State, a: Action): State {
           c.id === a.id ? { ...c, archived: a.archived } : c,
         ),
       }
+    case 'addCategory':
+      return { ...s, categories: [...s.categories, a.category] }
+    case 'completeOnboarding':
+      return { ...s, members: [a.member] }
   }
 }
 
@@ -246,6 +252,8 @@ interface Store {
   addValuation: (v: Valuation) => void
   renameCategory: (id: string, name: string) => void
   archiveCategory: (id: string, archived: boolean) => void
+  addCategory: (name: string, kind: 'expense' | 'income', parentId: string | null) => Category
+  completeOnboarding: (householdName: string, email: string) => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -254,29 +262,68 @@ let counter = 0
 const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${counter++}`
 
 export function StoreProvider({
-  children, initial,
-}: { children: ReactNode; initial: State }) {
+  children, initial, persist,
+}: {
+  children: ReactNode
+  initial: State
+  /**
+   * Called with every action after it is applied, so a storage layer can write
+   * it through. The store itself stays pure and testable without a database.
+   */
+  persist?: ((action: Action) => void) | undefined
+}) {
   const [state, dispatch] = useReducer(reduce, initial)
+  const fire = useCallback(
+    (action: Action) => {
+      dispatch(action)
+      persist?.(action)
+    },
+    [persist],
+  )
 
   const addTxn = useCallback((t: Omit<Txn, 'id'>) => {
     const txn: Txn = { ...t, id: newId('txn') }
-    dispatch({ type: 'addTxn', txn })
+    fire({ type: 'addTxn', txn })
     return txn
-  }, [])
+  }, [fire])
 
   const addPerson = useCallback((name: string) => {
     const person: Person = {
       id: newId('person'), name, relation: null, isMember: false, archived: false,
     }
-    dispatch({ type: 'addPerson', person })
+    fire({ type: 'addPerson', person })
     return person
-  }, [])
+  }, [fire])
 
   const addAccount = useCallback((a: Omit<Account, 'id'>) => {
     const account: Account = { ...a, id: newId('acct') }
-    dispatch({ type: 'addAccount', account })
+    fire({ type: 'addAccount', account })
     return account
-  }, [])
+  }, [fire])
+
+  const addCategory = useCallback(
+    (name: string, kind: 'expense' | 'income', parentId: string | null) => {
+      const category: Category = {
+        id: newId('cat'), name, kind, parentId,
+        isPersonFacing: false, archived: false, sortOrder: 999,
+      }
+      fire({ type: 'addCategory', category })
+      return category
+    },
+    [fire],
+  )
+
+  const completeOnboarding = useCallback((householdName: string, email: string) => {
+    const local = email.split('@')[0] ?? 'You'
+    const member: Member = {
+      id: newId('member'),
+      name: local.charAt(0).toUpperCase() + local.slice(1),
+      email,
+      role: 'owner',
+      isCurrentUser: true,
+    }
+    fire({ type: 'completeOnboarding', householdName, member })
+  }, [fire])
 
   const value = useMemo<Store>(
     () => ({
@@ -284,14 +331,16 @@ export function StoreProvider({
       addTxn,
       addPerson,
       addAccount,
-      updateTxn: (txn) => dispatch({ type: 'updateTxn', txn }),
-      deleteTxn: (id) => dispatch({ type: 'deleteTxn', id }),
-      updateAccount: (account) => dispatch({ type: 'updateAccount', account }),
-      addValuation: (valuation) => dispatch({ type: 'addValuation', valuation }),
-      renameCategory: (id, name) => dispatch({ type: 'renameCategory', id, name }),
-      archiveCategory: (id, archived) => dispatch({ type: 'archiveCategory', id, archived }),
+      addCategory,
+      completeOnboarding,
+      updateTxn: (txn) => fire({ type: 'updateTxn', txn }),
+      deleteTxn: (id) => fire({ type: 'deleteTxn', id }),
+      updateAccount: (account) => fire({ type: 'updateAccount', account }),
+      addValuation: (valuation) => fire({ type: 'addValuation', valuation }),
+      renameCategory: (id, name) => fire({ type: 'renameCategory', id, name }),
+      archiveCategory: (id, archived) => fire({ type: 'archiveCategory', id, archived }),
     }),
-    [state, addTxn, addPerson, addAccount],
+    [state, addTxn, addPerson, addAccount, addCategory, completeOnboarding, fire],
   )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

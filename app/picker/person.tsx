@@ -15,6 +15,7 @@ import { ZERO, type Money } from '@/domain/money'
 import { periodContaining, shiftPeriod } from '@/domain/period'
 import { spendByPerson } from '@/domain/ledger'
 import { useStore } from '@/store/store'
+import { resolvePerson } from '@/ui/pickerBridge'
 import { InitialsDisc, SearchMark } from '@/ui/marks'
 import { Body, Chip, Micro } from '@/ui/primitives'
 import { SheetTheme, useColors } from '@/ui/ThemeProvider'
@@ -73,7 +74,10 @@ function PersonPicker() {
         <Text style={{ fontFamily: fonts.archivo112_800, fontSize: 22, color: c.ink }}>
           Who is it for
         </Text>
-        <Pressable onPress={() => router.back()} style={[styles.close, { backgroundColor: c.sunken }]}>
+        <Pressable
+          onPress={() => { resolvePerson(null); router.back() }}
+          style={[styles.close, { backgroundColor: c.sunken }]}
+        >
           <Text style={{ fontFamily: fonts.archivo600, fontSize: 15, color: c.muted }}>×</Text>
         </Pressable>
       </View>
@@ -99,7 +103,11 @@ function PersonPicker() {
           <View style={{ paddingHorizontal: 20, paddingTop: 18, gap: 4 }}>
             <Micro size={8.5} tracking={0.16}>Recent</Micro>
             {recent.map((p) => (
-              <Pressable key={p.id} onPress={() => router.back()} style={styles.row}>
+              <Pressable
+                key={p.id}
+                onPress={() => { resolvePerson(p.id); router.back() }}
+                style={styles.row}
+              >
                 <InitialsDisc name={p.name} size={30} active />
                 <View style={{ flex: 1, gap: 3 }}>
                   <Text style={{ fontFamily: fonts.bodySemi, fontSize: 13.5, color: c.ink }}>
@@ -119,7 +127,11 @@ function PersonPicker() {
             <Micro size={8.5} tracking={0.16}>Everyone else</Micro>
             <View style={styles.chips}>
               {tail.map((p) => (
-                <Chip key={p.id} label={p.name} onPress={() => router.back()} />
+                <Chip
+                  key={p.id}
+                  label={p.name}
+                  onPress={() => { resolvePerson(p.id); router.back() }}
+                />
               ))}
             </View>
           </View>
@@ -128,7 +140,8 @@ function PersonPicker() {
         {q !== '' && !exact && (
           <Pressable
             onPress={() => {
-              addPerson(query.trim())
+              const added = addPerson(query.trim())
+              resolvePerson(added.id)
               router.back()
             }}
             style={[styles.addRow, { borderColor: c.line }]}

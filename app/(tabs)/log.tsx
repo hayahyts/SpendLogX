@@ -7,11 +7,11 @@
  */
 
 import { useMemo, useState } from 'react'
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ZERO, add, type Money } from '@/domain/money'
-import type { Txn } from '@/domain/ledger'
+import type { Txn, TxnType } from '@/domain/ledger'
 import { spendAmount } from '@/domain/ledger'
 import {
   type State, accountById, categoryPath, personById, useAppState,
@@ -45,8 +45,21 @@ function dayLabel(iso: string, today: string): string {
   return stamp
 }
 
+interface Filters {
+  type: TxnType | null
+  accountId: string | null
+}
+
 /** Search covers everything a person might remember about a row. */
-function matches(state: State, txn: Txn, query: string): boolean {
+function matches(state: State, txn: Txn, query: string, filters: Filters): boolean {
+  if (filters.type !== null && txn.type !== filters.type) return false
+  if (
+    filters.accountId !== null &&
+    txn.accountId !== filters.accountId &&
+    txn.counterAccountId !== filters.accountId
+  ) {
+    return false
+  }
   if (query.trim() === '') return true
   const q = query.trim().toLowerCase()
   const haystack = [
@@ -59,15 +72,21 @@ function matches(state: State, txn: Txn, query: string): boolean {
   return haystack.some((h) => h.toLowerCase().includes(q))
 }
 
+const TYPE_LABEL: Record<TxnType, string> = {
+  expense: 'Expenses', income: 'Income', transfer: 'Transfers',
+}
+
 export default function Log() {
   const c = useColors()
   const insets = useSafeAreaInsets()
   const state = useAppState()
   const [query, setQuery] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filters, setFilters] = useState<Filters>({ type: null, accountId: null })
 
   const found = useMemo(
-    () => state.txns.filter((t) => matches(state, t, query)),
-    [state, query],
+    () => state.txns.filter((t) => matches(state, t, query, filters)),
+    [state, query, filters],
   )
 
   const days = useMemo(() => {
@@ -89,8 +108,38 @@ export default function Log() {
     >
       <View style={[gutter, styles.head]}>
         <ScreenTitle>Transactions</ScreenTitle>
-        <GoldLink isMicro size={10}>filter</GoldLink>
+        <GoldLink isMicro size={10} onPress={() => setFilterOpen((o) => !o)}>
+          filter
+        </GoldLink>
       </View>
+
+      {filterOpen && (
+        <View style={[gutter, styles.filterRow]}>
+          {(['expense', 'income', 'transfer'] as const).map((kind) => (
+            <FilterChip
+              key={kind}
+              label={TYPE_LABEL[kind]}
+              active={filters.type === kind}
+              onPress={() =>
+                setFilters((f) => ({ ...f, type: f.type === kind ? null : kind }))
+              }
+            />
+          ))}
+          {state.accounts.filter((a) => !a.archived).map((a) => (
+            <FilterChip
+              key={a.id}
+              label={a.name}
+              active={filters.accountId === a.id}
+              onPress={() =>
+                setFilters((f) => ({
+                  ...f,
+                  accountId: f.accountId === a.id ? null : a.id,
+                }))
+              }
+            />
+          ))}
+        </View>
+      )}
 
       <View style={[gutter, { marginTop: 14 }]}>
         <View style={[styles.search, { backgroundColor: c.card }]}>
@@ -145,6 +194,8 @@ export default function Log() {
                       state={state}
                       enteredBy={partnerInitial(state, txn.id)}
                       onPress={() => router.push(`/txn/${txn.id}`)}
+                      onEdit={() => router.push(`/txn/${txn.id}?edit=1`)}
+                      onDelete={() => router.push(`/txn/${txn.id}?confirm=1`)}
                     />
                   </View>
                 ))}
@@ -157,8 +208,32 @@ export default function Log() {
   )
 }
 
+/** An active filter is an ink pill with an ×; inactive is outlined. */
+function FilterChip({
+  label, active, onPress,
+}: { label: string; active: boolean; onPress: () => void }) {
+  const c = useColors()
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.filterChip,
+        active
+          ? { backgroundColor: c.ink }
+          : { borderWidth: 1, borderColor: c.line },
+      ]}
+    >
+      <Text style={{ fontFamily: fonts.body, fontSize: 11.5, color: active ? c.card : c.muted }}>
+        {label}{active ? '  ×' : ''}
+      </Text>
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
+  filterChip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   search: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     borderRadius: radius.field, paddingVertical: 11, paddingHorizontal: 13,

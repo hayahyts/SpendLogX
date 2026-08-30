@@ -11,6 +11,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { childrenOf, topLevel, useAppState } from '@/store/store'
+import { resolveCategory } from '@/ui/pickerBridge'
 import { SearchMark } from '@/ui/marks'
 import { Body, Chip, Micro } from '@/ui/primitives'
 import { SheetTheme, useColors } from '@/ui/ThemeProvider'
@@ -65,7 +66,10 @@ function CategoryPicker() {
         <Text style={{ fontFamily: fonts.archivo112_800, fontSize: 22, color: c.ink }}>
           Category
         </Text>
-        <Pressable onPress={() => router.back()} style={[styles.close, { backgroundColor: c.sunken }]}>
+        <Pressable
+          onPress={() => { resolveCategory(null); router.back() }}
+          style={[styles.close, { backgroundColor: c.sunken }]}
+        >
           <Text style={{ fontFamily: fonts.archivo600, fontSize: 15, color: c.muted }}>×</Text>
         </Pressable>
       </View>
@@ -91,7 +95,11 @@ function CategoryPicker() {
           <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 2 }}>
             <Micro size={8.5} tracking={0.16}>Matches</Micro>
             {matching.map((cat) => (
-              <Pressable key={cat.id} onPress={() => router.back()} style={styles.row}>
+              <Pressable
+                key={cat.id}
+                onPress={() => { resolveCategory(cat.id); router.back() }}
+                style={styles.row}
+              >
                 <Highlighted text={cat.name} query={query} />
               </Pressable>
             ))}
@@ -103,7 +111,10 @@ function CategoryPicker() {
             const kids = childrenOf(state, parent.id)
             return (
               <View key={parent.id} style={{ gap: 9 }}>
-                <Pressable onPress={() => router.back()} style={styles.parentRow}>
+                <Pressable
+                  onPress={() => { resolveCategory(parent.id); router.back() }}
+                  style={styles.parentRow}
+                >
                   <Text style={{ fontFamily: fonts.bodySemi, fontSize: 14, color: c.ink }}>
                     {parent.name}
                   </Text>
@@ -118,7 +129,11 @@ function CategoryPicker() {
                 {kids.length > 0 && (
                   <View style={styles.kids}>
                     {kids.map((kid) => (
-                      <Chip key={kid.id} label={kid.name} onPress={() => router.back()} />
+                      <Chip
+                        key={kid.id}
+                        label={kid.name}
+                        onPress={() => { resolveCategory(kid.id); router.back() }}
+                      />
                     ))}
                   </View>
                 )}
