@@ -129,6 +129,15 @@ npm start         # Expo
 npx expo export --platform web   # then serve it to see the screens in a browser
 ```
 
+The APK is built locally, never committed (`dist/` and `*.apk` are ignored):
+
+```bash
+cd android && EXPO_PUBLIC_DEMO=0 ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+```
+
+`EXPO_PUBLIC_DEMO=0` is what makes it start empty; a stale Metro cache has
+silently kept demo mode in a build before, so if in doubt add `--rerun-tasks`.
+
 To check the row-level security against a real Postgres rather than trusting
 it, run `scripts/supabase-stub.sql` (the two roles and the two `auth` helpers
 Supabase supplies), then `supabase/setup.sql`, then `scripts/verify-rls.sql`.

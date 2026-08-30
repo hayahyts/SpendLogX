@@ -1,6 +1,10 @@
 node_modules/
 .expo/
 build-dist/
+
+# Built locally, never committed
+*.apk
+dist/
 web-build/
 *.log
 .DS_Store
