@@ -48,6 +48,19 @@ function Shell() {
           name="add"
           options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
         />
+        {/* Pickers open over the add sheet and inherit its dark composition. */}
+        <Stack.Screen
+          name="picker/category"
+          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="picker/person"
+          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+        />
+        {/* Detail screens push over the tabs with a rise and fade. */}
+        <Stack.Screen name="txn/[id]" options={{ animation: 'fade_from_bottom' }} />
+        <Stack.Screen name="person/[id]" options={{ animation: 'fade_from_bottom' }} />
+        <Stack.Screen name="category/[id]" options={{ animation: 'fade_from_bottom' }} />
       </Stack>
       <StatusBar style="auto" />
     </View>
