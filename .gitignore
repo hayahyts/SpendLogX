@@ -10,3 +10,9 @@ expo-env.d.ts
 
 # Web export used for visual verification
 /web-export
+
+# Android build residue inside the prebuilt project
+android/.kotlin/
+android/app/build/
+android/build/
+android/.gradle/
