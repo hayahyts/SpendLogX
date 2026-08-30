@@ -45,20 +45,31 @@ always positive. What a transaction does to an account is decided in one place,
 `effects()` in `src/domain/ledger.ts`, and both databases enforce the shape
 with check constraints.
 
-## What the import does to the spreadsheet's 40 rows
+## The app starts empty
 
-Run `npm run import` to see the full report. The substance of it:
+No accounts, no balances, no transactions. At setup you add each account and
+type its balance — positive for a wallet, negative for a debt. Nothing is
+inferred and nothing is pre-filled.
 
-| | Sheet | After import |
+The one thing carried over is the **taxonomy**: 13 expense categories, their
+subcategories, and 18 people. That was a year of thinking and it is worth
+keeping; the sheet's *numbers* were not.
+
+## What the audit found
+
+`npm run import` re-runs it. The spreadsheet's own figures against what they
+actually meant:
+
+| | Sheet said | Actually |
 | --- | --- | --- |
-| Expenses | ₵48,943 | **₵9,844** — land purchases and the loan repayment are transfers, not spending |
-| Income | ₵49,889.47 | **₵41,847** — opening balances no longer booked as salary |
-| Categories charted | 12 of 13 | **all 13** |
-| People | subcategories | **18, as their own dimension** |
-| Money owed | invisible | **a liability account**, subtracted from net worth |
+| Expenses | ₵48,943 | **₵9,844** — land and a loan repayment are transfers, not spending |
+| Income | ₵49,889.47 | **₵41,847** — opening balances had been booked as salary |
+| Categories charted | 12 of 13 | Family was missing, hiding ₵3,541 |
+| Spending on "Beb" | ₵13,874 | ₵2,275 — the rest was an ₵11,599 loan repayment |
+| Rows with a real date | — | 11 of 40; the other 29 carry the form's default |
 
-Twenty-nine rows share the date `2026-05-04` — the old entry form's default.
-They import unchanged, by decision; the report warns about them.
+None of those 40 rows reaches the app. The audit exists so the findings stay
+reproducible, and the tests assert against them.
 
 ## Status
 

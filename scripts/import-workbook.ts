@@ -1,6 +1,15 @@
 /**
- * Reads Spending_Tracker_GHS.xlsx and emits the seed data for a fresh install,
- * plus a report of every transform it applied.
+ * Reads Spending_Tracker_GHS.xlsx and emits two different things.
+ *
+ * The **seed** is what a fresh install starts with, and it is only the
+ * taxonomy: categories and people. No accounts, no balances, no transactions.
+ * You add your accounts at setup and type every balance yourself, so nothing
+ * the app shows is inherited from a spreadsheet whose own figures were wrong.
+ *
+ * The **analysis** is what the spreadsheet actually contained, and it never
+ * reaches the app. It exists so the audit stays reproducible: it is how 48,943
+ * of claimed spending was shown to be 9,844 of real consumption, and the tests
+ * assert against it so that finding cannot quietly rot.
  *
  * Re-runnable and deterministic: ids are derived from the source values, so
  * running it twice produces byte-identical output.
@@ -14,8 +23,6 @@ import path from 'node:path'
 import ExcelJS from 'exceljs'
 import { type Money, ZERO, format, fromSheetNumber, pesewas } from '../src/domain/money'
 import { type IsoDate, isoDate } from '../src/domain/period'
-
-const HOUSEHOLD_ID = 'hh_spendlogx'
 
 /** Subcategories that name a person rather than a kind of spending. */
 const PEOPLE = new Set([
@@ -125,17 +132,21 @@ function readMoney(cell: ExcelJS.Cell): Money {
 
 // ---------------------------------------------------------------------------
 
+/** What a fresh install starts with. Taxonomy only. */
 export interface Seed {
-  household: { id: string; name: string }
-  accounts: {
-    id: string; name: string; kind: string
-    openingBalanceMinor: number; openingBalanceOn: string; sortOrder: number
-  }[]
   categories: {
     id: string; name: string; kind: 'expense' | 'income'
     parentId: string | null; isPersonFacing: boolean; sortOrder: number
   }[]
   people: { id: string; name: string; memberUserId: string | null }[]
+}
+
+/** What the spreadsheet held. Used for the audit; never shipped to the app. */
+export interface Analysis {
+  accounts: {
+    id: string; name: string; kind: string
+    openingBalanceMinor: number; openingBalanceOn: string; sortOrder: number
+  }[]
   txns: {
     id: string; type: 'expense' | 'income' | 'transfer'; occurredOn: string
     amountMinor: number; tipsMinor: number; feeMinor: number
@@ -152,7 +163,9 @@ export interface Report {
   totals: { expenses: string; income: string; transfers: string; assetPurchases: string }
 }
 
-export async function importWorkbook(file: string): Promise<{ seed: Seed; report: Report }> {
+export async function importWorkbook(
+  file: string,
+): Promise<{ seed: Seed; analysis: Analysis; report: Report }> {
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.readFile(file)
 
@@ -235,7 +248,7 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
 
   // Spendable accounts open where history ends: the user types what they
   // actually hold, and the imported rows do not move that figure.
-  const accounts: Seed['accounts'] = [...accountNames].sort().map((name, i) => ({
+  const accounts: Analysis['accounts'] = [...accountNames].sort().map((name, i) => ({
     id: id('acct', name),
     name,
     kind: ACCOUNT_KIND[name] ?? 'cash',
@@ -288,7 +301,7 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
   const liabilityAccountId = id('acct', LIABILITY_ACCOUNT_NAME)
 
   // --- transactions ---------------------------------------------------------
-  const txns: Seed['txns'] = []
+  const txns: Analysis['txns'] = []
   let expenses = ZERO
   let income = ZERO
   let transfers = ZERO
@@ -450,10 +463,8 @@ export async function importWorkbook(file: string): Promise<{ seed: Seed; report
   }
 
   return {
-    seed: {
-      household: { id: HOUSEHOLD_ID, name: 'Household' },
-      accounts, categories, people, txns,
-    },
+    seed: { categories, people },
+    analysis: { accounts, txns },
     report: {
       counts: {
         accounts: accounts.length,
@@ -493,12 +504,15 @@ async function main() {
     return
   }
 
-  console.log(`\nImported ${workbook} -> ${out}\n`)
-  console.log('  Accounts     ', report.counts.accounts)
-  console.log('  Categories   ', report.counts.categories)
-  console.log('  People       ', report.counts.people)
-  console.log('  Transactions ', report.counts.transactions)
-  console.log('\n  Expenses        ', report.totals.expenses)
+  console.log(`\nRead ${workbook}\n`)
+  console.log(`  Seeded to ${out} — the taxonomy only:`)
+  console.log('    Categories ', report.counts.categories)
+  console.log('    People     ', report.counts.people)
+  console.log('\n  Not seeded. You add accounts and type every balance at setup:')
+  console.log('    Accounts in the sheet     ', report.counts.accounts)
+  console.log('    Transactions in the sheet ', report.counts.transactions)
+  console.log('\n  What the sheet actually meant:')
+  console.log('  Expenses        ', report.totals.expenses)
   console.log('  Income          ', report.totals.income)
   console.log('  Transfers       ', report.totals.transfers)
   console.log('  Of which assets ', report.totals.assetPurchases)

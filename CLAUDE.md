@@ -46,21 +46,23 @@ check constraints.
 Accra is UTC+0 so nothing breaks today, but the type stops a future timezone
 moving somebody's spending into the previous month.
 
-**An opening balance means different things by account kind,** deliberately:
+**Every balance is typed, none is inferred.** At setup you create each account
+yourself and enter its balance — positive for a wallet, negative for a debt,
+cost for an asset. Nothing is pre-filled and nothing is derived from history.
+One rule, no exceptions, and it is what makes the app's figures trustworthy
+from the first screen: the spreadsheet's own opening balances were fiction,
+booked as salary and overstating income by ₵8,042.47.
 
-- A **wallet** (cash, mobile money, bank) holds what you have *now*. It opens
-  at setup, and imported history before that date does not move it.
-- An **asset** (Land) holds a *cost basis*, which accumulates over time. It
-  opens before all history, or the ₵27,500 of land reads as having cost
-  nothing. What it is *worth* is separate, in `account_valuation`.
-- A **liability** (Loan from Beb) holds what is *still owed*, as a **negative**
-  balance: a debt of ₵11,599 opens at `-1159900` and repayments move it up
-  toward zero. Storing the sign this way means `effects()` and `balances()`
-  need no notion of debt — repaying is an ordinary transfer — and net worth
-  simply adds every balance together. It opens at setup, like a wallet.
+A **liability** holds what is owed as a **negative** balance: a debt of ₵11,599
+is entered as `-1159900`, and repayments move it up toward zero. Storing the
+sign this way means `effects()` and `balances()` need no notion of debt —
+repaying is an ordinary transfer — and net worth simply adds every balance
+together.
 
-`balances()` applies this cutoff per account, so a transfer can be history on
-one side and current on the other.
+`balances()` still applies an `openingBalanceOn` cutoff per account, so a
+transfer can be history on one side and current on the other. Nothing in the
+app relies on that today, since there is no imported history, but the ledger
+supports it and a test pins it.
 
 **Net worth counts assets at valuation, never at ledger balance.** Doing both
 double-counts. An unvalued asset falls back to its cost basis and flags itself
@@ -69,11 +71,14 @@ double-counts. An unvalued asset falls back to its cost basis and flags itself
 
 **Buying an asset and repaying a debt are transfers, not spending.** Neither is
 consumption. Together they were ₵39,099 of the sheet's ₵48,943, which is why
-the spending figure fell to ₵9,844.
+its real consumption was ₵9,844.
 
-A transfer counts on a side only if it falls on or after that account's opening
-date. Mixing opening dates across the two sides of one transfer therefore moves
-net worth — correct, but surprising, and it has already broken a test.
+**The app starts empty.** No accounts, no balances, no transactions. The only
+thing seeded is the taxonomy — 13 expense categories, their subcategories, and
+18 people — because that is a year of the user's own thinking and rebuilding it
+by hand would be an hour wasted. `scripts/import-workbook.ts` is now an *audit*
+tool, not a seeding one: it proves the figures above are real and emits only
+`categories` and `people`. `seed.json` contains no dates and no money.
 
 ## Layout
 
@@ -81,7 +86,7 @@ net worth — correct, but surprising, and it has already broken a test.
 | --- | --- |
 | `src/domain/` | Money, dates, ledger, net worth. Pure TypeScript — no Expo, no database. Where correctness lives. |
 | `src/db/` | Drizzle schemas per dialect, plus the imported `seed.json`. |
-| `scripts/import-workbook.ts` | Reads the spreadsheet, emits the seed, reports every transform. |
+| `scripts/import-workbook.ts` | Audits the spreadsheet. Emits only the taxonomy as `seed.json`; the accounts and 40 transactions it parses stay in `analysis` and never ship. |
 | `app/` | expo-router screens. A placeholder until designs land. |
 
 The two schemas are written out separately because Drizzle's column builders
@@ -93,7 +98,7 @@ they haven't. If you add a column, add it on both sides.
 ```bash
 npm test          # vitest
 npm run typecheck
-npm run import    # regenerate src/db/seed.json from the workbook
+npm run import    # re-audit the workbook, regenerate the taxonomy seed
 npm start         # Expo
 ```
 
@@ -113,13 +118,14 @@ Quoted often, and each is checked by a test:
 | Loan repaid to Beb | ₵11,599 — a transfer into a liability, not spending |
 | Family spending the dashboard hid | ₵3,541 |
 | Conflated under the name "Beb" | ₵13,874 in the sheet — ₵2,275 of family spending plus an ₵11,599 loan repayment, now separated |
-| Rows carrying the old form's default date | 29 of 40, imported unchanged by decision |
+| Rows carrying the old form's default date | 29 of 40 — one reason none of it is imported |
 
 ## Open
 
-**The "Loan Repayment" category now has no transactions.** Repayments are
-transfers into a liability account, so the category survives only as a trap for
-anyone who logs the next one as an expense. Archive it, or keep it? Undecided.
+**Two seeded categories are traps.** `Loan Repayment` and `Investment` both
+describe transfers, not spending — repaying a debt and buying land. Seeding
+them invites logging the next one as an expense, which is the exact mistake the
+model exists to prevent. Archive them, or keep them? Undecided.
 
-**The asset epoch is a hardcoded `2000-01-01`.** Deriving it from the earliest
-transaction would be tidier.
+**`Friends` and `Poor` are seeded as people.** They are Charity subcategories in
+the sheet, not named individuals. Probably an importer misclassification.

@@ -55,15 +55,15 @@ tips), income **49,889.47**, transfers **10,611.00**.
 | **Capture speed is the product.** Success = logging a transaction in ~5 seconds. | "Better analytics" — the sheet's failure was friction, evidenced by 29 rows entered in one backfill session. |
 | **Real ledger with correct balances.** | Spend-log with no balances — you'd still be checking the MoMo app. |
 | **Local-first: expo-sqlite is authoritative, Supabase syncs behind it.** | Cloud-first — every save becomes a round-trip to a distant region. It rebuilds the exact friction that killed the sheet. |
-| **The spreadsheet dies.** One-time import, app owns the data thereafter. | Two-way Google Sheets sync — weeks of conflict resolution for a file you'd stop opening. |
+| **The spreadsheet dies completely.** Its 40 transactions are not imported; only the taxonomy is. | Importing the history. 29 of 40 rows carry the form's default date and every opening balance was fiction, so the data would poison the app's first charts. |
 | **`Payment Method` is deleted. `Account` carries the meaning.** Each account has a kind (cash / mobile money / bank / asset). | Keeping both — the data shows no real distinction in 37 of 40 rows. |
 | **Transfers are two-sided: from → to, plus a fee field.** The fee captures MoMo cash-out charges so balances reconcile. | Single-sided transfers — they make balances impossible. |
 | **Household with two members, shared pot.** You and Beb. | Single-user — would need a schema rewrite later, not a migration. |
 | **Land becomes an asset account with tracked value,** and money owed becomes a liability account. Buying land and repaying a loan are both transfers, not expenses. True consumption drops from 48,943 to 9,844. | Leaving it as an expense — one land purchase would dominate every chart and average forever. |
 | **People are a first-class dimension**, separate from category. | People-as-subcategories — that is precisely what causes the `Beb` collision. |
-| **Import all 40 rows as-is, including the 29 default dates.** | Flagging or dropping them. Accepted limitation: pre-July 2026 charts are shaped by one backfill day. |
+| **Every balance is typed at setup — positive, negative or asset cost.** Accounts start empty and you create each one. | Pre-filling, or deriving balances from history. One rule with no exceptions is easier to trust and easier to design a setup screen around. |
 | **Tips survives, behind a "More" disclosure.** | Prominent field — GHS 90 across two months doesn't earn a tap on every entry. |
-| **Balances set manually at first run.** The sheet's numbers are ignored. | Deriving from the two fake salary rows — MoMo has no opening figure there. |
+| **The taxonomy is kept** — 13 categories, their subcategories, 18 people. | Starting with nothing, or a generic starter set. The taxonomy is a year of the user's own thinking; the specificity (Extended Family, Masjid, Charity) is what made the sheet good. |
 | **No budgets in v1.** | Monthly limits — you've never had them and didn't ask. Revisit once there's real usage. |
 | **Everything ships in one release** — capture, balances, list, dashboard, people, net worth. Design is produced first and approved before build. | A staged release. You'd rather migrate once than twice. Accepted cost: no working app in hand until the whole thing is built. |
 
@@ -203,24 +203,28 @@ an interface, and PowerSync is the escape hatch if it misbehaves.
 
 ---
 
-## 6. Import plan
+## 6. What comes from the spreadsheet
 
-A one-off, re-runnable Node script reading the `.xlsx` and emitting seed data,
-plus a report of every transform it applied.
+`scripts/import-workbook.ts` is an **audit** tool, not a seeding one. It emits
+`seed.json` containing only `categories` and `people` — no accounts, no
+balances, no transactions, and no dates at all. Everything else it parses stays
+in an `analysis` result that the app never sees, and exists so the audit
+findings stay reproducible and testable.
 
 | Sheet reality | Becomes |
 | --- | --- |
 | `Settings!A:B` | The one category tree. `M:N` discarded entirely. |
 | `Payment Method` column | Dropped. The 3 contradicting rows resolve to their `Account` value. |
-| `Investment / Land` (27,500) | An `asset` account named Land. The 4 purchase rows become transfers into it. |
-| Person subcategories | `person` records; the txn keeps a category and gains a `person_id`. |
-| `Beb` | A person **and** a linked household member. |
-| `Loan Repayment / Beb` (11,599) | Imported as an expense for now — see open question 1. |
-| Zero-width cells | Decoded to `Fauzia` and `Nana Adjoa`, created as people. |
-| The 2 fake salary rows | Imported with `is_opening = true`; excluded from income. |
-| `Main job`, `Rising`, `Peswa` | Added to the income subcategory tree. |
-| The 29 default dates | Imported unchanged, as agreed. |
-| Row IDs 1–40 | Preserved as `legacy_row_id`. |
+| `Investment / Land` (27,500) | Audited as transfers into an asset account. Not imported. |
+| Person subcategories | **Seeded** as 18 `person` records, out of the category tree. |
+| `Beb` | Seeded as a person, linked to a household member. |
+| `Loan Repayment / Beb` (11,599) | Audited as a transfer into a liability. Not imported. |
+| Zero-width cells | Decoded to `Fauzia` and `Nana Adjoa`; seeded as people. |
+| The 2 fake salary rows | Dropped, along with everything else. Their existence is why no balance is inferred. |
+| `Main job`, `Rising`, `Peswa` | **Seeded** into the income subcategory tree. |
+| The 40 transactions | **Not imported.** The app starts empty. |
+| Account balances | **Not imported.** Typed at setup, positive or negative. |
+| The 29 default dates | Moot — nothing is imported. |
 
 ---
 

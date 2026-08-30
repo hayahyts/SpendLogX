@@ -174,7 +174,9 @@ That's open ground.
 
 All of this is from the actual data:
 
-**Accounts** — Cash · MoMo Wallet · Stanbic Bank · Land (asset)
+**Accounts** — none exist at first run. The user creates them; these are the
+ones they'll most likely add: Cash · MoMo Wallet · Stanbic Bank · Land (asset,
+cost ₵27,500) · Loan from Beb (liability, a negative balance)
 
 **Expense categories** — Food Drink · Transport · Bills Utilities · Shopping ·
 Health · Entertainment · Personal · Family · Extended Family · Charity ·
@@ -188,7 +190,8 @@ Car Wash, Rent, Electricity, Clothing, Pharmacy, Streaming, Education, Masjid
 **People** — Dedei · Koshie · Odarkor · Beb · Ibrahim · Abdur-Rahman · Jalil ·
 Auntie (Maxwell) · Nateki · Mommy · Fauzia · Nana Adjoa
 
-**Real transactions to populate mockups**
+**Real transactions to populate mockups** — the app ships with none of these;
+they are what the user will log, and what makes a realistic populated screen.
 
 | Amount | Description | Category | Account |
 | --- | --- | --- | --- |
@@ -317,13 +320,22 @@ Keep these consistent and systematic.
 
 **9. Household setup** — create a household, or join one by invite.
 
-**10. Account setup (first run)** — add each account with its kind and its
-**current balance, entered by hand**. This is a one-time screen but it's the
-foundation of every balance shown afterwards, so it must feel deliberate and
-unhurried — the opposite of the capture screen.
+**10. Account setup (first run)** ★ — the app starts with **no accounts at
+all**. You add each one, choose its kind, and type its balance by hand.
 
-**11. Import result** — a one-time confirmation that 40 transactions came
-across from the spreadsheet, with what was reclassified.
+This screen is the foundation of every figure shown afterwards, so it should
+feel deliberate and unhurried — the exact opposite of the capture screen. Two
+things it must handle well:
+
+- **Negative balances are normal here.** A debt is entered as a negative
+  figure, and it must be obvious that this is expected rather than an error. A
+  loan of ₵11,599 owed is a real, valid entry.
+- **Account kinds carry different meanings.** A wallet holds what you have, an
+  asset holds what it cost, a liability holds what you owe. The form should
+  make the right figure obvious without a paragraph of explanation.
+
+**States:** no accounts yet · one added · a negative balance entered · an
+attempt to continue with a blank balance.
 
 **12. Category picker (full)** — searchable, two-level tree.
 
