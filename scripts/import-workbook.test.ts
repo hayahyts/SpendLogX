@@ -1,0 +1,212 @@
+/**
+ * Runs the importer against the real workbook.
+ *
+ * These assertions are the model's proof: if reclassifying land, extracting
+ * people or flagging the opening balances is ever quietly undone, the totals
+ * below move and this fails.
+ */
+
+import path from 'node:path'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { parseCedis as c } from '../src/domain/money'
+import { isoDate, periodContaining } from '../src/domain/period'
+import { type Txn, balances, effects, spendByCategory, spendByPerson, totalsForPeriod } from '../src/domain/ledger'
+import { type Report, type Seed, decodeHidden, importWorkbook, isHidden } from './import-workbook'
+
+const WORKBOOK = path.join(__dirname, '..', 'docs', 'Spending_Tracker_GHS.xlsx')
+
+let seed: Seed
+let report: Report
+
+beforeAll(async () => {
+  ;({ seed, report } = await importWorkbook(WORKBOOK))
+}, 30_000)
+
+/** Seed rows as domain transactions, so the ledger can be run over them. */
+function asTxns(): Txn[] {
+  return seed.txns.map((t) => ({
+    id: t.id,
+    type: t.type,
+    occurredOn: isoDate(t.occurredOn),
+    amount: c(String(t.amountMinor / 100)),
+    tips: c(String(t.tipsMinor / 100)),
+    fee: c(String(t.feeMinor / 100)),
+    accountId: t.accountId,
+    counterAccountId: t.counterAccountId,
+    categoryId: t.categoryId,
+    personId: t.personId,
+    note: t.note,
+    isOpening: t.isOpening,
+  }))
+}
+
+describe('decodeHidden', () => {
+  it('recovers a name from zero-width characters', () => {
+    const encode = (s: string) =>
+      [...s]
+        .map((ch) =>
+          ch
+            .charCodeAt(0)
+            .toString(2)
+            .padStart(16, '0')
+            .replace(/0/g, '‌')
+            .replace(/1/g, '‍'),
+        )
+        .join('')
+    expect(decodeHidden(encode('Fauzia'))).toBe('Fauzia')
+    expect(decodeHidden(encode('Nana Adjoa'))).toBe('Nana Adjoa')
+  })
+
+  it('returns null when there is nothing encoded', () => {
+    expect(decodeHidden('‌')).toBeNull()
+    expect(decodeHidden('')).toBeNull()
+  })
+
+  it('recognises a cell made only of invisible characters', () => {
+    expect(isHidden('⁠‌‍⁤')).toBe(true)
+    expect(isHidden('Groceries')).toBe(false)
+    expect(isHidden('')).toBe(false)
+  })
+})
+
+describe('importing the real workbook', () => {
+  it('brings across all 40 rows', () => {
+    expect(report.counts.transactions).toBe(40)
+    expect(new Set(seed.txns.map((t) => t.legacyRowId)).size).toBe(40)
+  })
+
+  it('is deterministic, so re-running it changes nothing', async () => {
+    const again = await importWorkbook(WORKBOOK)
+    expect(again.seed.txns).toEqual(seed.txns)
+    expect(again.seed.categories).toEqual(seed.categories)
+    expect(again.seed.people).toEqual(seed.people)
+  }, 30_000)
+})
+
+describe('land stops being spending', () => {
+  it('reclassifies all four purchases into a transfer to the asset account', () => {
+    const land = seed.accounts.find((a) => a.name === 'Land')
+    expect(land?.kind).toBe('asset')
+
+    const intoLand = seed.txns.filter((t) => t.counterAccountId === land?.id)
+    expect(intoLand).toHaveLength(4)
+    expect(intoLand.every((t) => t.type === 'transfer' && t.categoryId === null)).toBe(true)
+    expect(intoLand.reduce((sum, t) => sum + t.amountMinor, 0)).toBe(c('27500'))
+  })
+
+  it('drops true spending to 21,443 — the sheet claimed 48,943', () => {
+    expect(report.totals.expenses).toBe('₵ 21,443.00')
+  })
+})
+
+describe('opening balances stop being income', () => {
+  it('flags both rows and removes 8,042.47 from income', () => {
+    const opening = seed.txns.filter((t) => t.isOpening)
+    expect(opening).toHaveLength(2)
+    expect(opening.reduce((sum, t) => sum + t.amountMinor, 0)).toBe(c('8042.47'))
+    // The sheet's own total was 49,889.47.
+    expect(report.totals.income).toBe('₵ 41,847.00')
+  })
+
+  it('leaves every account opening balance at zero, to be set by hand', () => {
+    expect(seed.accounts.every((a) => a.openingBalanceMinor === 0)).toBe(true)
+  })
+})
+
+describe('people become their own dimension', () => {
+  it('attaches a person to the 23 person-directed transactions', () => {
+    expect(seed.txns.filter((t) => t.personId !== null)).toHaveLength(23)
+  })
+
+  it('recovers the two names hidden in zero-width text', () => {
+    const names = seed.people.map((p) => p.name)
+    expect(names).toContain('Fauzia')
+    expect(names).toContain('Nana Adjoa')
+  })
+
+  it('links Beb to a household member, so support totals can exclude them', () => {
+    const beb = seed.people.find((p) => p.name === 'Beb')
+    expect(beb?.memberUserId).not.toBeNull()
+  })
+
+  it('totals Beb across both categories instead of double-counting the name', () => {
+    // "Beb" was a subcategory of Family and of Loan Repayment, so the sheet's
+    // subcategory total mixed a spa treatment with an 11,599 loan repayment.
+    const beb = seed.people.find((p) => p.name === 'Beb')
+    const bebTxns = seed.txns.filter((t) => t.personId === beb?.id)
+    const categories = new Set(bebTxns.map((t) => t.categoryId))
+    expect(categories.size).toBeGreaterThan(1)
+
+    const year = periodContaining('year', isoDate('2026-01-01'))
+    expect(spendByPerson(asTxns(), year).get(beb?.id ?? '')).toBe(c('13874'))
+  })
+
+  it('never leaves a person as a category', () => {
+    const names = new Set(seed.people.map((p) => p.name))
+    expect(seed.categories.filter((cat) => names.has(cat.name))).toEqual([])
+  })
+})
+
+describe('the taxonomy', () => {
+  it('keeps all 13 top-level expense categories, Family included', () => {
+    const top = seed.categories.filter((cat) => cat.parentId === null && cat.kind === 'expense')
+    expect(top.map((cat) => cat.name)).toContain('Family')
+    // The sheet's dashboard hardcoded 12 and hid 3,541 cedis of Family spending.
+    expect(top).toHaveLength(13)
+  })
+
+  it('discards the drifted dropdown lists in Settings M:N', () => {
+    const names = seed.categories.map((cat) => cat.name)
+    expect(names).not.toContain('Family Home') // only ever existed in column M
+    expect(names).not.toContain('Unplanned') // only ever existed in column N
+  })
+
+  it('is never more than two levels deep', () => {
+    const byId = new Map(seed.categories.map((cat) => [cat.id, cat]))
+    for (const cat of seed.categories) {
+      if (cat.parentId === null) continue
+      expect(byId.get(cat.parentId)?.parentId).toBeNull()
+    }
+  })
+
+  it('marks the categories that should offer a person', () => {
+    const facing = seed.categories.filter((cat) => cat.isPersonFacing).map((cat) => cat.name).sort()
+    expect(facing).toEqual(['Charity', 'Extended Family', 'Family', 'Loan Repayment'])
+  })
+})
+
+describe('the imported ledger is internally consistent', () => {
+  it('produces a valid effect for every transaction', () => {
+    for (const txn of asTxns()) expect(() => effects(txn)).not.toThrow()
+  })
+
+  it('touches only accounts that exist', () => {
+    const accounts = seed.accounts.map((a) => ({ id: a.id, openingBalance: c('0') }))
+    expect(() => balances(accounts, asTxns())).not.toThrow()
+  })
+
+  it('has category totals that add up to the expense total', () => {
+    // The defect this app exists to fix: the sheet's parts summed to 45,402
+    // against a stated total of 48,943.
+    const year = periodContaining('year', isoDate('2026-01-01'))
+    const txns = asTxns()
+    const parts = [...spendByCategory(txns, year).values()].reduce((a, b) => a + b, 0)
+    expect(parts).toBe(totalsForPeriod(txns, year).expenses)
+  })
+
+  it('records the Family spending the sheet hid', () => {
+    const family = seed.categories.find((cat) => cat.name === 'Family' && cat.parentId === null)
+    const year = periodContaining('year', isoDate('2026-01-01'))
+    expect(spendByCategory(asTxns(), year).get(family?.id ?? '')).toBe(c('3541'))
+  })
+})
+
+describe('the report', () => {
+  it('warns about the 29 rows sharing the form default date', () => {
+    expect(report.warnings.join(' ')).toMatch(/29 transactions share the date 2026-05-04/)
+  })
+
+  it('lists every transform it applied', () => {
+    expect(report.transforms.length).toBeGreaterThan(30)
+  })
+})

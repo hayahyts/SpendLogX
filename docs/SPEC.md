@@ -33,7 +33,7 @@ tips), income **49,889.47**, transfers **10,611.00**.
 | 2 | **29 of 40 rows carry the form's default date** (`2026-05-04`), including a row described "June Salary". Only 11 rows (28 Jun – 1 Jul 2026) have real dates. | 29 rows |
 | 3 | **Opening balances disguised as salary.** `Stanbic initial balance` (7,000.47) and `Initial Cash` (1,042) are entered as `Income / Salary / Main job`. | Income overstated by GHS 8,042 |
 | 4 | **`Payment Method` and `Account` model one concept.** 37 of 40 rows pair them 1:1 (Cash/Cash, Mobile Money/MoMo Wallet, Bank Transfer/Stanbic Bank). 3 rows contradict. On the single Transfer row the pair means from→to instead. | 1 redundant field, 3 bad rows |
-| 5 | **Subcategory totals double-count.** `Beb` is a subcategory of both `Family` and `Loan Repayment`; the Dashboard sums by subcategory name alone. | GHS 3,391 conflated |
+| 5 | **Subcategory totals double-count.** `Beb` is a subcategory of both `Family` and `Loan Repayment`; the Dashboard sums by subcategory name alone, reporting 13,874 that mixes 2,275 of family spending with an 11,599 loan repayment. | GHS 13,874 conflated |
 | 6 | **Three competing category lists, already drifted.** `Settings!A:B` is canonical; `M:N` are dropdown copies. `M` contains `Family Home` (exists nowhere else) and omits Investment, Charity, Loan Repayment. `N` lists `Donations`, `Childcare`, `Unplanned` that were never options. Live data uses `Main job`, absent from the income list. | Referential integrity gone |
 | 7 | **Four cells contain zero-width Unicode.** `Settings!B55`, `B56` and two transaction subcategories render blank but encode `Fauzia` and `Nana Adjoa`. | GHS 700 uncategorised |
 
