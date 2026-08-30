@@ -42,5 +42,9 @@
     "tsx": "^4.20.0",
     "typescript": "~5.9.3",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "react-native-worklets": "0.10.1",
+    "react-native-reanimated": "4.5.1"
   }
 }
